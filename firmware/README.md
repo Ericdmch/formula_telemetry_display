@@ -18,9 +18,9 @@ Tie the LCD RW pin to GND. Connect LCD power, ground, and contrast according
 to the module markings. The ring count, data pin, brightness, and LCD pins are
 configurable in `include/HardwareConfig.h`. The ring shows solid green for
 CLEAR, amber for YELLOW, and red for RED; STARTING and ERROR turn it off. The
-onboard RGB NeoPixel mirrors those colors; it shows blue at startup, purple when
-serial input is lost, and magenta on a device error. Brightness defaults to a
-low level. Check the board revision printed on the PCB: DevKitC-1 v1.0 uses
+onboard RGB NeoPixel mirrors the flag colors; it shows blue before the first
+valid flag and magenta on a device error. Brightness defaults to a low level.
+Check the board revision printed on the PCB: DevKitC-1 v1.0 uses
 GPIO48 for its onboard pixel and v1.1 uses GPIO38. Change
 `ONBOARD_NEOPIXEL_DATA_PIN` in `include/HardwareConfig.h` if your board uses
 GPIO38.
