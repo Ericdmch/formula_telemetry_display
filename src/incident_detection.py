@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from config import Config
+from src.speed_profile import SpeedProfile
 from src.track import Track, distance_along_track_m, forward_gap_m, project_to_track
 
 
@@ -43,8 +44,9 @@ class DetectedCar:
 
 
 class IncidentDetector:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, speed_profile: SpeedProfile | None = None):
         self.config = config
+        self.speed_profile = speed_profile
         self.histories: dict[int, deque[Sample]] = {}
 
     def update(self, frame: pd.DataFrame, track: Track) -> list[DetectedCar]:
@@ -137,19 +139,61 @@ class IncidentDetector:
                     car.closest_approaching_car_speed_kmh = other.speed_kmh
         return detected
 
+    def _expected_speed_kmh(self, s_m: float) -> float | None:
+        if self.speed_profile is None:
+            return None
+        return self.speed_profile.expected_speed_kmh(s_m)
+
+    def _slow_threshold_kmh(self, s_m: float) -> float:
+        """Speed below which a car counts as anomalously slow at this point.
+
+        Relative to the normal speed profile when one is available, with the
+        absolute stopped floor as a backstop.
+        """
+        expected = self._expected_speed_kmh(s_m)
+        if expected is None:
+            return self.config.stopped_speed_kmh
+        return max(
+            self.config.stopped_speed_kmh, self.config.stopped_speed_ratio * expected
+        )
+
+    def _recovered_threshold_kmh(self, s_m: float) -> float:
+        """Speed at or above which a slow episode ends at this point."""
+        expected = self._expected_speed_kmh(s_m)
+        if expected is None:
+            return self.config.recovered_speed_kmh
+        return max(
+            self.config.recovered_speed_kmh,
+            self.config.recovered_speed_ratio * expected,
+        )
+
     def _stationary_time(self, history: deque[Sample]) -> float:
+        """Time since the car last clearly moved, tolerating brief low-speed blips.
+
+        A crashed car being handled (or noisy samples) can briefly read a few
+        km/h without actually rejoining. Excursions above the slow threshold
+        are absorbed up to `stopped_blip_tolerance_s`; only speed at or above
+        the recovered threshold ends the stopped episode. Both thresholds are
+        relative to the normal speed profile at each sample's track position
+        when a profile is available, so circulating a slow corner at its normal
+        pace never counts as stationary.
+        """
         latest = history[-1]
-        if latest.speed_kmh >= self.config.stopped_speed_kmh:
+        if latest.speed_kmh >= self._recovered_threshold_kmh(latest.track_s_m):
             return 0.0
+        newest_first = list(history)[::-1]
         first_time = latest.timestamp_s
-        later = latest
-        for sample in list(history)[-2::-1]:
-            if sample.speed_kmh >= self.config.stopped_speed_kmh:
+        excursion_s = 0.0
+        for newer, older in zip(newest_first, newest_first[1:]):
+            if newer.timestamp_s - older.timestamp_s > self.config.max_interpolation_gap_s + 1e-9:
                 break
-            if later.timestamp_s - sample.timestamp_s > self.config.max_interpolation_gap_s + 1e-9:
+            if older.speed_kmh >= self._recovered_threshold_kmh(older.track_s_m):
                 break
-            first_time = sample.timestamp_s
-            later = sample
+            if older.speed_kmh >= self._slow_threshold_kmh(older.track_s_m):
+                excursion_s += newer.timestamp_s - older.timestamp_s
+                if excursion_s > self.config.stopped_blip_tolerance_s + 1e-9:
+                    break
+            first_time = older.timestamp_s
         return latest.timestamp_s - first_time
 
     def _gap_is_decreasing(

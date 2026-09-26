@@ -88,3 +88,49 @@ def point_at_distance(track: Track, distance_m: float) -> tuple[float, float]:
         start[0] + fraction * (end[0] - start[0]),
         start[1] + fraction * (end[1] - start[1]),
     )
+
+
+def _catmull_rom_point(
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    p2: tuple[float, float],
+    p3: tuple[float, float],
+    t: float,
+) -> tuple[float, float]:
+    """One Catmull-Rom sample between p1 and p2 (uniform, tension 0.5)."""
+    t2 = t * t
+    t3 = t2 * t
+    return (
+        0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t
+               + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+               + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+        0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t
+               + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+               + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3),
+    )
+
+
+def catmull_rom_closed(
+    points: list[tuple[float, float]], samples_per_segment: int = 24
+) -> list[tuple[float, float]]:
+    """Resample a closed control-point loop into a smooth dense polyline.
+
+    Display/geometry helper for turning sparse corner lists (e.g. Fast-F1
+    circuit info) into a drivable-looking centerline. Output is closed:
+    the last point repeats the first.
+    """
+    if len(points) < 4:
+        raise ValueError("need at least 4 control points for a closed spline")
+    if samples_per_segment < 1:
+        raise ValueError("samples_per_segment must be positive")
+    count = len(points)
+    sampled: list[tuple[float, float]] = []
+    for i in range(count):
+        p0 = points[(i - 1) % count]
+        p1 = points[i]
+        p2 = points[(i + 1) % count]
+        p3 = points[(i + 2) % count]
+        for j in range(samples_per_segment):
+            sampled.append(_catmull_rom_point(p0, p1, p2, p3, j / samples_per_segment))
+    sampled.append(sampled[0])
+    return sampled

@@ -1,5 +1,7 @@
 # FlagSense Software MVP Implementation Plan
 
+**Scope note (2026-09-26):** This is the telemetry-only implementation sequence, not the full FlagSense MVP contract. The project also requires one still-image evidence path (with offline fallback) and local environment context; those extensions are specified in [data contracts](../../DATA_CONTRACTS.md) and [architecture](../../ARCHITECTURE.md). The already implemented `src/risk_engine.py`, `src/explain.py`, and `src/pipeline.py` are part of this plan's early work. For current Python signatures and JSON values, use the contracts and code; the steps below remain a work plan.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task by task. Steps use checkbox syntax for tracking. Keep the software MVP stable before dashboard polish or hardware integration.
 
 **Goal:** Build an offline, explainable race-control decision-support demo that replays multiple cars, detects a developing incident, estimates severity with a small Random Forest, and recommends GREEN, YELLOW, then RED FLAG RECOMMENDED.
@@ -243,7 +245,7 @@ The hardware adapter file can wait until after MVP. Keep the package flat; do no
     load_track(path: Path) -> Track
     project_to_track(x_m: float, y_m: float, track: Track) -> TrackPosition
     IncidentDetector.update(frame: pd.DataFrame, track: Track) -> list[DetectedCar]
-    extract_features(car: DetectedCar, frame: pd.DataFrame, track: Track, history: History) -> SafetyFeatures
+    extract_features(car: DetectedCar) -> SafetyFeatures
     generate_training_data(seed: int, per_class: int) -> pd.DataFrame
     train_model(table: pd.DataFrame, model_path: Path) -> EvaluationReport
     RiskEstimator.load_or_fallback(path: Path) -> RiskEstimator
@@ -413,7 +415,7 @@ Start each only after the preceding software MVP is demonstrably stable.
 
 ## 28. Deliberate exclusions
 
-No authentication, accounts, database, cloud backend, React, mobile app, live CAN bus, real race-control integration, neural network, computer vision, LLM flag decision, distributed system, automatic flag activation, production deployment, perfect vehicle physics, or real-world safety validation. This prototype demonstrates an explainable decision pipeline over simulated telemetry.
+No authentication, accounts, database, cloud backend, React, mobile app, live CAN bus, real race-control integration, neural network, live video, custom computer-vision training, LLM flag decision, distributed system, automatic flag activation, production deployment, perfect vehicle physics, or real-world safety validation. The full FlagSense MVP adds a provider-agnostic one-image evidence adapter with a local fallback after this telemetry-only software milestone.
 
 ## References for implementation
 

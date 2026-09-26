@@ -1,0 +1,2 @@
+-r requirements.txt
+fastf1==3.8.3

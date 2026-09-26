@@ -106,3 +106,33 @@ def test_gap_in_samples_discards_stale_deceleration(track: Track) -> None:
 
     assert car.peak_decel_g == 0.0
     assert car.severe_decel is False
+
+
+def test_brief_low_speed_blip_does_not_reset_stopped(track: Track) -> None:
+    """A crashed car nudged at a few km/h (recovery/noise) stays stopped."""
+    detector = IncidentDetector(Config())
+    for tick in range(25):
+        detector.update(frame(tick / 10, [(12, 0, 100, 0, 0)]), track)
+    car = None
+    for tick in range(25, 35):
+        car = detector.update(frame(tick / 10, [(12, 0, 100, 6, 0)]), track)[0]
+        assert car.stopped is True
+    for tick in range(35, 41):
+        car = detector.update(frame(tick / 10, [(12, 0, 100, 0, 0)]), track)[0]
+
+    assert car is not None
+    assert car.stopped is True
+    assert car.stationary_time_s == pytest.approx(4.0)
+
+
+def test_sustained_drive_away_ends_stopped_episode(track: Track) -> None:
+    detector = IncidentDetector(Config())
+    for tick in range(25):
+        detector.update(frame(tick / 10, [(12, 0, 100, 0, 0)]), track)
+    car = None
+    for tick in range(25, 45):
+        car = detector.update(frame(tick / 10, [(12, 0, 100, 40, 0)]), track)[0]
+
+    assert car is not None
+    assert car.stationary_time_s == 0
+    assert car.stopped is False
