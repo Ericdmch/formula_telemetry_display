@@ -96,3 +96,13 @@ def test_gap_in_samples_resets_stationary_duration(track: Track) -> None:
 
     assert car.stationary_time_s == 0
     assert car.stopped is False
+
+
+def test_gap_in_samples_discards_stale_deceleration(track: Track) -> None:
+    detector = IncidentDetector(Config())
+    detector.update(frame(0.0, [(12, 0, 100, 100, -3.0)]), track)
+
+    car = detector.update(frame(1.0, [(12, 0, 100, 100, 0.0)]), track)[0]
+
+    assert car.peak_decel_g == 0.0
+    assert car.severe_decel is False

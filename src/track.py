@@ -23,8 +23,19 @@ class TrackPosition:
 def load_track(path: Path) -> Track:
     raw = json.loads(path.read_text())
     points = tuple((float(x), float(y)) for x, y in raw["points"])
+    return _build_track(points)
+
+
+def demo_track_fallback() -> Track:
+    """Use the demo course geometry when its JSON asset is unavailable."""
+    return _build_track(((0, 0), (1200, 0), (1200, 400), (0, 400), (0, 0)))
+
+
+def _build_track(points: tuple[tuple[float, float], ...]) -> Track:
     if len(points) < 4 or points[0] != points[-1]:
         raise ValueError("track must be a closed polyline with at least 3 segments")
+    if not all(math.isfinite(value) for point in points for value in point):
+        raise ValueError("track coordinates must be finite")
     cumulative = [0.0]
     for a, b in zip(points, points[1:]):
         length = math.dist(a, b)

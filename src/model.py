@@ -175,14 +175,25 @@ class RiskEstimator:
     def load_or_fallback(cls, path: Path) -> "RiskEstimator":
         try:
             bundle = joblib.load(path)
+            estimator = bundle["estimator"]
             if (
                 bundle["schema_version"] != SCHEMA_VERSION
                 or tuple(bundle["feature_columns"]) != FEATURE_COLUMNS
                 or bundle["class_names"] != CLASS_NAMES
-                or set(bundle["estimator"].classes_) != set(CLASS_NAMES)
+                or set(estimator.classes_) != set(CLASS_NAMES)
+                or tuple(estimator.feature_names_in_) != FEATURE_COLUMNS
+                or estimator.n_features_in_ != len(FEATURE_COLUMNS)
             ):
                 raise ValueError("model schema mismatch")
-            return cls(bundle["estimator"])
+            probe = pd.DataFrame(
+                [[0.0] * len(FEATURE_COLUMNS)], columns=FEATURE_COLUMNS
+            )
+            probabilities = estimator.predict_proba(probe)
+            if probabilities.shape != (1, len(CLASS_NAMES)) or not np.isfinite(
+                probabilities
+            ).all():
+                raise ValueError("model inference check failed")
+            return cls(estimator)
         except Exception:
             return cls()
 
@@ -203,7 +214,12 @@ class RiskEstimator:
                 }
         else:
             vector = pd.DataFrame([features.model_vector()], columns=FEATURE_COLUMNS)
-            values = self.estimator.predict_proba(vector)[0]
+            try:
+                values = self.estimator.predict_proba(vector)[0]
+            except Exception:
+                self.estimator = None
+                self.model_source = "rules_fallback"
+                return self.predict(features)
             probabilities = {
                 CLASS_NAMES[int(class_id)]: float(probability)
                 for class_id, probability in zip(self.estimator.classes_, values)

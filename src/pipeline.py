@@ -8,7 +8,7 @@ from src.features import extract_features
 from src.incident_detection import IncidentDetector
 from src.model import RiskEstimator
 from src.risk_engine import recommend_flag
-from src.track import Track, load_track
+from src.track import Track, demo_track_fallback, load_track
 
 
 @dataclass(frozen=True)
@@ -40,7 +40,17 @@ class SafetyPipeline:
         estimator: RiskEstimator | None = None,
     ):
         self.config = config or Config()
-        self.track = track or load_track(self.config.track_path)
+        self.track_quality_note: str | None = None
+        if track is not None:
+            self.track = track
+        else:
+            try:
+                self.track = load_track(self.config.track_path)
+            except (OSError, ValueError, KeyError, TypeError):
+                self.track = demo_track_fallback()
+                self.track_quality_note = (
+                    "Track asset unavailable; using built-in demo geometry"
+                )
         self.estimator = estimator or RiskEstimator.load_or_fallback(
             self.config.model_path
         )
@@ -114,7 +124,7 @@ class SafetyPipeline:
             }
             for car in detected
         ]
-        quality_notes = []
+        quality_notes = [self.track_quality_note] if self.track_quality_note else []
         for row in frame.itertuples(index=False):
             if getattr(row, "speed_imputed", False):
                 quality_notes.append(f"Car #{row.car_id} speed interpolated")
@@ -156,5 +166,9 @@ class SafetyPipeline:
             features=None,
             reasons=[],
             vehicles=[],
-            quality_notes=[reason],
+            quality_notes=(
+                [reason, self.track_quality_note]
+                if self.track_quality_note
+                else [reason]
+            ),
         )

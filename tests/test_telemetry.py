@@ -73,3 +73,14 @@ def test_does_not_turn_long_missing_gap_into_zero_speed(tmp_path: Path) -> None:
     assert [len(frame) for frame in frames] == [1, 1]
     assert frames[1].iloc[0]["speed_kmh"] == 80.0
 
+
+def test_consecutive_missing_speeds_do_not_bridge_detector_continuity(tmp_path: Path) -> None:
+    rows = [sample(tick / 10, 7, 0.0) for tick in range(20)]
+    rows.extend(sample(tick / 10, 7, None) for tick in (20, 21, 22))
+    rows.append(sample(2.3, 7, 0.0))
+    frames = load_telemetry(write_csv(tmp_path / "race.csv", rows))
+
+    assert [round(float(frame["timestamp_s"].iloc[0]), 1) for frame in frames[-2:]] == [
+        1.9,
+        2.3,
+    ]

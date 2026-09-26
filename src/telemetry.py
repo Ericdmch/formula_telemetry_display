@@ -77,14 +77,14 @@ def load_telemetry(path: Path) -> list[pd.DataFrame]:
 def _repair_column(
     table: pd.DataFrame, group: pd.DataFrame, column: str, flag_column: str
 ) -> None:
-    values = group[column]
-    for row_index in group.index[values.isna()]:
-        before = group.loc[(group.index < row_index) & group[column].notna()]
-        after = group.loc[(group.index > row_index) & group[column].notna()]
-        if before.empty or after.empty:
+    for position in range(1, len(group) - 1):
+        row_index = group.index[position]
+        if pd.notna(group.iloc[position][column]):
             continue
-        prior = before.iloc[-1]
-        following = after.iloc[0]
+        prior = group.iloc[position - 1]
+        following = group.iloc[position + 1]
+        if pd.isna(prior[column]) or pd.isna(following[column]):
+            continue
         time = float(table.at[row_index, "timestamp_s"])
         left_gap = time - float(prior["timestamp_s"])
         right_gap = float(following["timestamp_s"]) - time

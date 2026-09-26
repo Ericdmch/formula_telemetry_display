@@ -68,3 +68,15 @@ def test_missing_frame_is_not_displayed_as_green(tmp_path: Path) -> None:
     assert unavailable["status"] == "DATA_UNAVAILABLE"
     assert unavailable["flag"] is None
     assert unavailable["quality_notes"]
+
+
+def test_missing_track_uses_built_in_geometry_with_quality_note(tmp_path: Path) -> None:
+    config = Config(track_path=tmp_path / "missing-track.json")
+    pipeline = SafetyPipeline(config, estimator=RiskEstimator())
+
+    result = pipeline.update(frame(0.0))
+
+    assert result.status == "OK"
+    assert result.flag == "GREEN"
+    assert len(result.vehicles) == 2
+    assert any("track" in note.lower() for note in result.quality_notes)

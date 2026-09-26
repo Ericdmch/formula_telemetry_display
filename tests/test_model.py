@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pytest
 
 from src.features import FEATURE_COLUMNS, SafetyFeatures
@@ -95,3 +96,35 @@ def test_missing_or_incompatible_artifact_uses_visible_rule_fallback(tmp_path: P
     joblib.dump({"schema_version": 999}, invalid_path)
     invalid = RiskEstimator.load_or_fallback(invalid_path)
     assert invalid.model_source == "rules_fallback"
+
+
+def test_model_with_wrong_fitted_feature_names_uses_fallback(tmp_path: Path) -> None:
+    path = tmp_path / "wrong_features.joblib"
+    train_model(generate_training_data(per_class=20), path)
+    bundle = joblib.load(path)
+    bundle["estimator"].feature_names_in_ = np.array(
+        ["wrong_name", *FEATURE_COLUMNS[1:]]
+    )
+    joblib.dump(bundle, path)
+
+    estimator = RiskEstimator.load_or_fallback(path)
+
+    assert estimator.model_source == "rules_fallback"
+    assert (
+        estimator.predict(features(stationary_time_s=5)).model_source
+        == "rules_fallback"
+    )
+
+
+def test_inference_failure_switches_loaded_model_to_fallback(tmp_path: Path) -> None:
+    path = tmp_path / "risk_model.joblib"
+    train_model(generate_training_data(per_class=20), path)
+    estimator = RiskEstimator.load_or_fallback(path)
+    estimator.estimator.feature_names_in_ = np.array(
+        ["wrong_name", *FEATURE_COLUMNS[1:]]
+    )
+
+    result = estimator.predict(features(stationary_time_s=5))
+
+    assert result.model_source == "rules_fallback"
+    assert result.risk_score == pytest.approx(0.25)

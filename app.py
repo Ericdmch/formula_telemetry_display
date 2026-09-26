@@ -7,7 +7,7 @@ import streamlit as st
 from config import Config
 from src.pipeline import AnalysisResult, SafetyPipeline
 from src.telemetry import load_telemetry
-from src.track import Track, load_track
+from src.track import Track
 
 
 CONFIG = Config()
@@ -28,14 +28,9 @@ def demo_frames():
     return load_telemetry(CONFIG.demo_path)
 
 
-@st.cache_data
-def demo_track() -> Track:
-    return load_track(CONFIG.track_path)
-
-
 def reset_playback() -> None:
     frames = demo_frames()
-    pipeline = SafetyPipeline(CONFIG, demo_track())
+    pipeline = SafetyPipeline(CONFIG)
     st.session_state.pipeline = pipeline
     st.session_state.playback_index = 0
     st.session_state.latest_result = pipeline.update(frames[0])
@@ -276,7 +271,10 @@ def race_control() -> None:
     track_column, status_column = st.columns([1.65, 1], gap="large")
     with track_column:
         st.subheader("Track view")
-        st.plotly_chart(track_figure(result, demo_track()), use_container_width=True)
+        st.plotly_chart(
+            track_figure(result, st.session_state.pipeline.track),
+            use_container_width=True,
+        )
     with status_column:
         with st.container(border=True):
             render_status(result)

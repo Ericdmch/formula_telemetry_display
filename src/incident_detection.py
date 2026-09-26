@@ -61,6 +61,12 @@ class IncidentDetector:
             car_id = int(row.car_id)
             projected = project_to_track(float(row.x_m), float(row.y_m), track)
             history = self.histories.setdefault(car_id, deque())
+            if (
+                history
+                and timestamp - history[-1].timestamp_s
+                > self.config.max_interpolation_gap_s + 1e-9
+            ):
+                history.clear()
             history.append(
                 Sample(
                     timestamp,
