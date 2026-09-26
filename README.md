@@ -52,3 +52,10 @@ The input CSV requires `timestamp_s`, `car_id`, `x_m`, `y_m`, `speed_kmh`, `long
 The thresholds in `config.py` are **prototype settings**, not official motorsport rules. The “racing line” is the centerline of the supplied synthetic track. The Random Forest was trained and evaluated only on generated examples; the holdout report must not be read as real-world safety accuracy. Flag recommendations also use deterministic gates, including a confirmed stop, so a brief deceleration alone does not change the displayed flag. If the model file is missing or incompatible, inference falls back to explicit rules and the dashboard labels that source.
 
 FlagSense has no camera analysis, LLM, database, cloud service, or automatic flag control. The prerecorded CSV is the dependable demo input. Hardware integration can consume the pipeline’s output contract later, after the core replay is stable.
+
+## ESP32 display firmware
+
+The serial protocol and ESP32 firmware are documented in
+[`FLAGSENSE_SERIAL_PROTOCOL.md`](FLAGSENSE_SERIAL_PROTOCOL.md) and
+[`firmware/README.md`](firmware/README.md). The firmware uses an LCD1602A and
+NeoPixel ring for driver-facing safety states.
