@@ -1,0 +1,4 @@
+{
+  "description": "Synthetic closed course; four custom demo sectors",
+  "points": [[0, 0], [1200, 0], [1200, 400], [0, 400], [0, 0]]
+}
