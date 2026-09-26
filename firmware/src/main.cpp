@@ -7,52 +7,38 @@
 #include "SerialProtocol.h"
 #include "StateMachine.h"
 
-#ifndef FLAGSENSE_DEBUG
-#define FLAGSENSE_DEBUG 1
-#endif
-
 namespace {
 flagsense::LineFramer framer;
 flagsense::StateMachine stateMachine;
 flagsense::Renderer renderer;
-unsigned long lastValidInput = 0;
-bool linkLost = false;
-constexpr unsigned long LINK_LOSS_TIMEOUT_MS = 5000;  // Protocol suggests 5 s.
+unsigned long lastStatusOutput = 0;
+constexpr unsigned long STATUS_HEARTBEAT_MS = 1000;
 
 void logParseError(flagsense::ParseError error) {
-#if FLAGSENSE_DEBUG
-  Serial.print("DEBUG PARSE ERROR: ");
+  Serial.print("STATUS,REJECTED,");
   Serial.println(flagsense::parseErrorName(error));
-#else
-  (void)error;
-#endif
 }
 
 void handleLine(const char* line) {
-#if FLAGSENSE_DEBUG
-  Serial.print("DEBUG RX: ");
+  Serial.print("RX,");
   Serial.println(line);
-#endif
   const flagsense::ParseResult result = flagsense::parseMessage(line);
   if (!result.success) {
     logParseError(result.error);
     return;
   }
-  lastValidInput = millis();
-  const bool recovered = stateMachine.setLinkLost(false);
-  linkLost = false;
   if (result.message.type == flagsense::MessageType::DEVICE_TEST ||
       result.message.type == flagsense::MessageType::LED_TEST ||
       result.message.type == flagsense::MessageType::DISPLAY_TEST) {
+    Serial.print("STATUS,TEST,");
+    Serial.println(flagsense::messageTypeName(result.message.type));
     renderer.startTest(result.message.type, millis());
     return;
   }
   const bool stateChanged = stateMachine.handleMessage(result.message);
-  if (stateChanged || recovered) {
-#if FLAGSENSE_DEBUG
-    Serial.print("DEBUG STATE -> ");
+  if (stateChanged) {
+    Serial.print("STATUS,STATE,");
     Serial.println(flagsense::systemStateName(stateMachine.state()));
-#endif
     renderer.applyState(stateMachine.state(), stateMachine.incident());
   }
 }
@@ -67,7 +53,7 @@ void setup() {
   if (!displayReady) {
     Serial.println("STATUS,ERROR,DEVICE_ERROR");
   }
-  lastValidInput = millis();
+  lastStatusOutput = millis();
   Serial.println("STATUS,READY");
 }
 
@@ -83,10 +69,9 @@ void loop() {
   }
 
   const unsigned long now = millis();
-  if (!linkLost && now - lastValidInput >= LINK_LOSS_TIMEOUT_MS) {
-    linkLost = true;
-    stateMachine.setLinkLost(true);
-    renderer.applyState(stateMachine.state(), stateMachine.incident());
+  if (now - lastStatusOutput >= STATUS_HEARTBEAT_MS) {
+    lastStatusOutput = now;
+    Serial.println("STATUS,READY");
   }
   if (renderer.tick(now)) renderer.applyState(stateMachine.state(), stateMachine.incident());
 }
