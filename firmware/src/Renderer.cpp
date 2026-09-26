@@ -8,18 +8,22 @@ namespace flagsense {
 
 void Renderer::begin() {
   allOff();
+  setStartupIndicator();
   renderStartup();
 }
 
 void Renderer::applyState(SystemState state, const FlagMessage& incident) {
   testActive_ = false;
   switch (state) {
-    case SystemState::STARTING: allOff(); renderStartup(); break;
+    case SystemState::STARTING: allOff(); setStartupIndicator(); renderStartup(); break;
     case SystemState::CLEAR: setGreen(); renderClear(); break;
     case SystemState::YELLOW: setYellow(); renderIncident(state, incident); break;
     case SystemState::RED: setRed(); renderIncident(state, incident); break;
-    case SystemState::LINK_LOST: renderLinkLost(incident); break;  // Preserve confirmed flag LED.
-    case SystemState::ERROR: allOff(); renderError(); break;
+    case SystemState::LINK_LOST:
+      setLinkLostIndicator();
+      renderLinkLost(incident);
+      break;  // Preserve confirmed flag on the external ring.
+    case SystemState::ERROR: allOff(); setErrorIndicator(); renderError(); break;
   }
 }
 

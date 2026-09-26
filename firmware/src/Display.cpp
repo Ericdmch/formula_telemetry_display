@@ -3,6 +3,7 @@
 #include <LiquidCrystal.h>
 #include <stdio.h>
 #include "HardwareConfig.h"
+#include "SerialProtocol.h"
 
 namespace flagsense {
 namespace {

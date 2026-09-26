@@ -14,6 +14,11 @@ constexpr int LCD_D6_PIN = 8;
 constexpr int LCD_D7_PIN = 9;
 constexpr int NEOPIXEL_DATA_PIN = 18;
 constexpr int NEOPIXEL_COUNT = 24;
+#ifndef ONBOARD_NEOPIXEL_DATA_PIN
+// ESP32-S3-DevKitC-1 v1.0 uses GPIO48; v1.1 uses GPIO38.
+#define ONBOARD_NEOPIXEL_DATA_PIN 48
+#endif
+constexpr int ONBOARD_NEOPIXEL_PIN = ONBOARD_NEOPIXEL_DATA_PIN;
 constexpr uint8_t NEOPIXEL_BRIGHTNESS = 32;
 constexpr unsigned long TEST_LED_STEP_MS = 400;
 constexpr unsigned long TEST_DISPLAY_MS = 800;
