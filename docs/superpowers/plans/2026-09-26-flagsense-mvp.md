@@ -145,13 +145,13 @@ This is a 0–1 severity index, not the probability of a real accident. Predicte
 
 Compute a per-car recommendation, then choose the most urgent across cars using GREEN < YELLOW < RED_RECOMMENDED. Ties go to higher risk_score, then lower car_id. The order below is explicit:
 
-1. No confirmed stop, no severe-deceleration candidate, and no multiple-car anomaly: GREEN.
+1. No confirmed stop and no multiple-car anomaly: GREEN. A severe-deceleration candidate remains visible evidence but does not alone issue a flag recommendation.
 2. Base model mapping: risk_score < 0.35 → GREEN; 0.35–0.749... → YELLOW; >= 0.75 → RED_RECOMMENDED.
 3. Override to at least YELLOW when stationary_time_s >= 2.0 and on_racing_line=1, or when any stopped car has approaching traffic within 200 m at closing speed >= 80 km/h.
 4. Override to RED_RECOMMENDED when stationary_time_s >= 4.0, on_racing_line=1, approaching car distance <= 150 m, and closing speed >= 120 km/h.
 5. Override to RED_RECOMMENDED when multiple_cars_affected=1 and risk_score >= 0.60.
 
-For severe deceleration without a stop, require current speed < 30 km/h or another confirmed hazard before RED_RECOMMENDED. This prevents one noisy acceleration sample from prompting the highest recommendation. Show the chosen rule ID in the result for auditability. A flag is a recommendation for race control, never an actuation command.
+Severe deceleration without a confirmed stop or multi-car anomaly remains a candidate observation. This prevents one noisy acceleration sample from prompting a changing flag recommendation during the default replay. Show the chosen rule ID in the result for auditability. A flag is a recommendation for race control, never an actuation command.
 
 ## 11. Deterministic explanation rules
 

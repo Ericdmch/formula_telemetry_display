@@ -79,7 +79,7 @@ def test_close_fast_traffic_forces_red_recommendation() -> None:
     ]
 
 
-def test_one_deceleration_sample_at_racing_speed_cannot_recommend_red() -> None:
+def test_unconfirmed_deceleration_is_evidence_without_a_flag_recommendation() -> None:
     case = features(
         peak_decel_g=-3.5,
         severe_decel=True,
@@ -87,7 +87,7 @@ def test_one_deceleration_sample_at_racing_speed_cannot_recommend_red() -> None:
     )
     decision = recommend_flag(case, model(0.9), Config())
 
-    assert decision.flag == "YELLOW"
+    assert decision.flag == "GREEN"
     assert build_reasons(case, decision, Config()) == [
         "Peak deceleration was -3.5 g"
     ]

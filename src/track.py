@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from bisect import bisect_right
 import json
 import math
 from pathlib import Path
@@ -61,3 +62,18 @@ def forward_gap_m(incident_s_m: float, other_s_m: float, length_m: float) -> flo
 def distance_along_track_m(a_s_m: float, b_s_m: float, length_m: float) -> float:
     forward = (a_s_m - b_s_m) % length_m
     return min(forward, length_m - forward)
+
+
+def point_at_distance(track: Track, distance_m: float) -> tuple[float, float]:
+    """Interpolate a position on the bundled centerline."""
+    s_m = distance_m % track.length_m
+    segment = bisect_right(track.cumulative_m, s_m) - 1
+    start = track.points[segment]
+    end = track.points[segment + 1]
+    fraction = (s_m - track.cumulative_m[segment]) / (
+        track.cumulative_m[segment + 1] - track.cumulative_m[segment]
+    )
+    return (
+        start[0] + fraction * (end[0] - start[0]),
+        start[1] + fraction * (end[1] - start[1]),
+    )

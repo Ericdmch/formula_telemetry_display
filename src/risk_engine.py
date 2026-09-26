@@ -14,8 +14,12 @@ class FlagDecision:
 def recommend_flag(
     features: SafetyFeatures, model_result: ModelResult, config: Config
 ) -> FlagDecision:
-    if not features.incident_detected:
-        return FlagDecision("GREEN", "NO_INCIDENT")
+    stopped = features.stationary_time_s >= config.stopped_time_s
+    if not stopped and not features.multiple_cars_affected:
+        return FlagDecision(
+            "GREEN",
+            "UNCONFIRMED_CANDIDATE" if features.incident_detected else "NO_INCIDENT",
+        )
 
     score = model_result.risk_score
     if score >= config.red_risk_threshold:
@@ -25,7 +29,6 @@ def recommend_flag(
     else:
         decision = FlagDecision("GREEN", "MODEL_RISK_LOW")
 
-    stopped = features.stationary_time_s >= config.stopped_time_s
     close_fast_traffic = (
         features.closest_approaching_car_id is not None
         and features.closest_car_distance_m <= config.close_distance_m
@@ -40,13 +43,6 @@ def recommend_flag(
         return FlagDecision("RED_RECOMMENDED", "ON_LINE_CLOSE_FAST_TRAFFIC")
     if features.multiple_cars_affected and score >= 0.60:
         return FlagDecision("RED_RECOMMENDED", "MULTI_CAR_HIGH_RISK")
-    if (
-        decision.flag == "RED_RECOMMENDED"
-        and not stopped
-        and features.speed_kmh >= 30
-        and not features.multiple_cars_affected
-    ):
-        return FlagDecision("YELLOW", "SEVERE_DECEL_CAP")
     if decision.flag == "GREEN" and stopped and features.on_racing_line:
         return FlagDecision("YELLOW", "STOPPED_ON_LINE")
     if (

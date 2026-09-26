@@ -26,4 +26,6 @@ class Config:
     data_unavailable_gap_s: float = 1.0
     track_path: Path = ROOT / "data" / "track.json"
     demo_path: Path = ROOT / "data" / "demo_race.csv"
+    training_path: Path = ROOT / "data" / "synthetic_training.csv"
     model_path: Path = ROOT / "models" / "risk_model.joblib"
+    evaluation_path: Path = ROOT / "models" / "evaluation.txt"
