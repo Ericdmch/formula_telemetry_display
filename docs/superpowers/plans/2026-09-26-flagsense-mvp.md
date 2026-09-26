@@ -87,7 +87,7 @@ The Random Forest receives exactly these seven fields, in this fixed order:
 | --- | --- | --- |
 | stationary_time_s | Continuous time with speed < 5 km/h, reset on a gap > 0.3 s | 0 |
 | peak_decel_g | Minimum signed longitudinal acceleration in trailing 2.0 s | 0 |
-| on_racing_line | 1 if stopped car is within 3 m of the track centerline; otherwise 0 | 0 |
+| on_racing_line | 1 if car is within 3 m of the track centerline; the flag rules combine this with stopped status | 0 |
 | closing_speed_kmh | Maximum of 0 and approaching car speed minus incident car speed | 0 |
 | closest_car_distance_m | Forward along-track distance to closest valid approaching car | 500 |
 | nearby_cars | Other cars within 150 m along track in either direction | 0 |
@@ -103,7 +103,7 @@ Use one bundled closed centerline polyline with cumulative metre distances and f
 | --- | --- | --- |
 | Severe deceleration | Trailing 2 s minimum acceleration <= -2.5 g | peak_decel_g and candidate event |
 | Stopped vehicle | Speed < 5 km/h continuously for >= 2.0 s | stationary_time_s and confirmed incident |
-| On/near racing line | Confirmed stopped car within 3.0 m of centerline | on_racing_line |
+| On/near racing line | Car within 3.0 m of centerline; an obstruction claim also requires a confirmed stop | on_racing_line |
 | Approaching traffic | Other car is 0–250 m behind incident along track, speed >= 80 km/h, positive closing speed, and forward gap decreased over consecutive frames | Closest car ID, distance, speed, closing speed |
 | Multiple affected cars | At least two stopped/anomalous cars within 35 m along track | multiple_cars_affected |
 

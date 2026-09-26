@@ -93,8 +93,8 @@ class IncidentDetector:
                     peak_decel_g=peak_decel,
                     stopped=stopped,
                     severe_decel=severe,
-                    on_racing_line=stopped
-                    and projected.offset_m <= self.config.racing_line_tolerance_m,
+                    on_racing_line=projected.offset_m
+                    <= self.config.racing_line_tolerance_m,
                 )
             )
 

@@ -53,6 +53,15 @@ def test_severe_deceleration_uses_trailing_two_seconds(track: Track) -> None:
     assert car.stopped is False
 
 
+def test_moving_car_on_centerline_is_not_an_obstruction(track: Track) -> None:
+    detector = IncidentDetector(Config())
+    car = detector.update(frame(0.0, [(12, 0, 100, 210, 0)]), track)[0]
+
+    assert car.on_racing_line is True
+    assert car.stopped is False
+    assert car.incident_detected is False
+
+
 def test_approach_requires_decreasing_forward_gap(track: Track) -> None:
     detector = IncidentDetector(Config())
     for tick in range(21):
