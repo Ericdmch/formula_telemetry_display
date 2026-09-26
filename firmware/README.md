@@ -2,14 +2,15 @@
 
 ## Hardware
 
-The renderer uses a bare 16-pin HD44780-compatible LCD1602A in 4-bit mode,
-plus a 24-pixel WS2812/NeoPixel ring. It assumes an ESP32 DevKit pinout:
+The renderer targets an ESP32-S3-DevKitC-1 N16R8 board and uses a bare
+16-pin HD44780-compatible LCD1602A in 4-bit mode, plus a 24-pixel
+WS2812/NeoPixel ring:
 
 | Signal | ESP32 GPIO |
 |---|---:|
-| LCD RS | 23 |
-| LCD Enable | 22 |
-| LCD D4, D5, D6, D7 | 21, 19, 25, 26 |
+| LCD RS | 4 |
+| LCD Enable | 5 |
+| LCD D4, D5, D6, D7 | 6, 7, 8, 9 |
 | NeoPixel data | 18 |
 
 Tie the LCD RW pin to GND. Connect LCD power, ground, and contrast according
