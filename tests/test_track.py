@@ -28,4 +28,3 @@ def test_projection_and_forward_gap_follow_track_not_straight_line(tmp_path: Pat
 
 def test_forward_gap_handles_start_finish_wrap() -> None:
     assert forward_gap_m(20, 3180, 3200) == pytest.approx(40)
-
