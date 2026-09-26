@@ -7,7 +7,9 @@ from src.explain import build_reasons
 from src.features import extract_features
 from src.incident_detection import IncidentDetector
 from src.model import RiskEstimator
-from src.risk_engine import recommend_flag
+from src.risk_engine import latch_flag, recommend_flag, severity
+from src.sensor_fusion import EnvironmentalContext, VisualFeatures, fuse_features
+from src.speed_profile import SpeedProfile
 from src.track import Track, demo_track_fallback, load_track
 
 
@@ -27,6 +29,7 @@ class AnalysisResult:
     reasons: list[str]
     vehicles: list[dict]
     quality_notes: list[str]
+    context_evidence: dict | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -38,8 +41,10 @@ class SafetyPipeline:
         config: Config | None = None,
         track: Track | None = None,
         estimator: RiskEstimator | None = None,
+        speed_profile: SpeedProfile | None = None,
     ):
         self.config = config or Config()
+        self.speed_profile = speed_profile
         self.track_quality_note: str | None = None
         if track is not None:
             self.track = track
@@ -54,10 +59,23 @@ class SafetyPipeline:
         self.estimator = estimator or RiskEstimator.load_or_fallback(
             self.config.model_path
         )
-        self.detector = IncidentDetector(self.config)
+        self.detector = IncidentDetector(self.config, self.speed_profile)
         self.last_timestamp_s: float | None = None
+        # Prototype latch: once VSC or above is recommended, hold it instead of
+        # downgrading later in the same run.
+        self._latched_flag: str = "GREEN"
+        self._latched_rule_id: str | None = None
 
-    def update(self, frame: pd.DataFrame) -> AnalysisResult:
+    def reset(self) -> None:
+        """Clear per-run state: detector histories, frame clock, flag latch."""
+        self.detector = IncidentDetector(self.config, self.speed_profile)
+        self.last_timestamp_s = None
+        self._latched_flag = "GREEN"
+        self._latched_rule_id = None
+
+    def update(self, frame: pd.DataFrame,
+               environment: EnvironmentalContext | None = None,
+               visual: VisualFeatures | None = None) -> AnalysisResult:
         if frame.empty:
             timestamp = (
                 0.0 if self.last_timestamp_s is None else self.last_timestamp_s
@@ -80,19 +98,28 @@ class SafetyPipeline:
 
         candidates = []
         for car in detected:
-            features = extract_features(car)
+            features = fuse_features(extract_features(car), environment, visual)
             model_result = self.estimator.predict(features)
             decision = recommend_flag(features, model_result, self.config)
             candidates.append((features, model_result, decision))
-        priority = {"GREEN": 0, "YELLOW": 1, "RED_RECOMMENDED": 2}
         features, model_result, decision = max(
             candidates,
             key=lambda item: (
-                priority[item[2].flag],
-                item[1].risk_score,
+                severity(item[2].flag),
+                round(item[1].risk_score, 6),
                 -item[0].car_id,
             ),
         )
+        held_flag = latch_flag(self._latched_flag, decision.flag)
+        if severity(held_flag) > severity(decision.flag):
+            # Latched: keep the earlier escalation and its rule.
+            flag = self._latched_flag
+            rule_id = self._latched_rule_id
+        else:
+            flag = decision.flag
+            rule_id = decision.rule_id
+            self._latched_flag = flag
+            self._latched_rule_id = rule_id
         incident = None
         approaching = None
         model_features = None
@@ -130,21 +157,28 @@ class SafetyPipeline:
                 quality_notes.append(f"Car #{row.car_id} speed interpolated")
             if getattr(row, "accel_imputed", False):
                 quality_notes.append(f"Car #{row.car_id} acceleration interpolated")
+        reasons = build_reasons(features, decision, self.config)
+        if severity(held_flag) > severity(decision.flag):
+            reasons.append(
+                f"Recommendation held at {flag.replace('_', ' ')}: no downgrade "
+                "after escalation (prototype latch)"
+            )
         return AnalysisResult(
             timestamp_s=timestamp,
             status="OK",
-            flag=decision.flag,
+            flag=flag,
             severity=model_result.predicted_class,
             risk_score=model_result.risk_score,
             probabilities=model_result.probabilities,
             model_source=model_result.model_source,
-            rule_id=decision.rule_id,
+            rule_id=rule_id,
             incident=incident,
             closest_approaching_car=approaching,
             features=model_features,
-            reasons=build_reasons(features, decision, self.config),
+            reasons=reasons,
             vehicles=vehicles,
             quality_notes=quality_notes,
+            context_evidence=features.context_dict() if features.incident_detected else None,
         )
 
     def _unavailable(self, timestamp: float, reason: str) -> AnalysisResult:

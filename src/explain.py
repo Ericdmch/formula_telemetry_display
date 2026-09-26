@@ -1,10 +1,11 @@
 from config import Config
 from src.features import SafetyFeatures
 from src.risk_engine import FlagDecision
+from src.sensor_fusion import FusedFeatures
 
 
 def build_reasons(
-    features: SafetyFeatures, decision: FlagDecision, config: Config
+    features: SafetyFeatures | FusedFeatures, decision: FlagDecision, config: Config
 ) -> list[str]:
     if not features.incident_detected:
         return []
@@ -29,4 +30,15 @@ def build_reasons(
         reasons.append(f"Peak deceleration was {features.peak_decel_g:.1f} g")
     if features.multiple_cars_affected:
         reasons.append("Multiple cars are stopped or anomalous in the same region")
+    if isinstance(features, FusedFeatures):
+        if features.track_wet is True:
+            reasons.append("Wet track context is available")
+        if features.visibility_condition == "POOR":
+            reasons.append("Poor visibility is documented")
+        if features.recovery_vehicle_present is True:
+            reasons.append("Recovery vehicle presence is reported in this replay")
+        if features.vision_debris_visible is True:
+            reasons.append("Debris is visible in the attached still image")
+        if features.vision_track_blockage_fraction is not None:
+            reasons.append(f"Image shows about {features.vision_track_blockage_fraction:.0%} apparent blockage")
     return reasons

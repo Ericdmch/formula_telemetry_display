@@ -1,0 +1,71 @@
+{
+  "scenario_id": "2024_qatar_mirror_debris",
+  "title": "2024 Qatar \u2014 Mirror debris",
+  "season": 2024,
+  "event": "Qatar Grand Prix",
+  "session": "Race",
+  "description": "Alex Albon's mirror detached on the main straight and lay on the circuit under double yellows. No VSC was ever deployed; the Safety Car came only after Bottas shattered the mirror and punctures followed \u2014 a documented delayed-VSC example.",
+  "incident_cars": [
+    77
+  ],
+  "approaching_cars": [
+    44,
+    55
+  ],
+  "data_quality": "HISTORICALLY_GROUNDED_RECONSTRUCTION",
+  "incident_offset_s": 5.0,
+  "incident_start_time_utc": "2024-12-01T16:40:00",
+  "incident_time_quality": "REPORTED_APPROXIMATE",
+  "field_provenance": {
+    "relative_time_s": "DERIVED",
+    "speed_kmh": "SIMULATED",
+    "x_m": "SIMULATED",
+    "y_m": "SIMULATED",
+    "longitudinal_accel_g": "SIMULATED",
+    "sector": "SIMULATED"
+  },
+  "actual_control_actions": [
+    {
+      "relative_time_s": 5.0,
+      "action": "DOUBLE YELLOW",
+      "source": "RACEFANS",
+      "timing_quality": "REPORTED_APPROXIMATE"
+    },
+    {
+      "relative_time_s": 160.0,
+      "action": "SAFETY CAR",
+      "source": "AUTOSPORT",
+      "timing_quality": "REPORTED_APPROXIMATE"
+    }
+  ],
+  "context_events": [
+    {
+      "event": "Debris reported on track",
+      "relative_time_s": 0.0,
+      "quality": "REPORTED",
+      "detail": "Mirror on main straight"
+    }
+  ],
+  "presentation_note": "Documented: no VSC was ever deployed for the mirror; the Safety Car came only after punctures, several laps later. The-Race called it a 'bafflingly slow decision'; the FIA defended it as 'normal practice' \u2014 genuinely disputed.",
+  "weather_context": {
+    "rainfall": false,
+    "source": "REPORTED",
+    "quality": "REPORTED"
+  },
+  "track_context": {
+    "location": "Main straight",
+    "source": "THE_RACE",
+    "quality": "REPORTED"
+  },
+  "notes": [
+    "Historical control actions and FlagSense recommendations are separate outputs.",
+    "The prototype RED_RECOMMENDED state is not an FIA red-flag rule.",
+    "The debris hazard is a documented marshal/race-control report; FlagSense treats it as reported context, not a telemetry detection."
+  ],
+  "limitations": [
+    "No licensed incident photograph is bundled.",
+    "Fallback motion is simulated and illustrates documented conditions, not measured car motion.",
+    "The real mirror-to-Safety-Car gap was about four laps; the timeline is compressed for demo length.",
+    "Control-action timings are approximate, derived from contemporary reporting."
+  ]
+}

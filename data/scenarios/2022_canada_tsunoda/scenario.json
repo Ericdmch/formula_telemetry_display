@@ -1,0 +1,61 @@
+{
+  "scenario_id": "2022_canada_tsunoda",
+  "title": "2022 Canada \u2014 Tsunoda",
+  "season": 2022,
+  "event": "Canadian Grand Prix",
+  "session": "Race",
+  "description": "Yuki Tsunoda crashed at the pit-lane exit late in the race. The incident was covered by yellow flags for roughly a full lap before race control deployed the Safety Car \u2014 a documented delayed Safety Car example.",
+  "incident_cars": [
+    22
+  ],
+  "approaching_cars": [
+    55,
+    16
+  ],
+  "data_quality": "HISTORICALLY_GROUNDED_RECONSTRUCTION",
+  "incident_offset_s": 5.0,
+  "incident_start_time_utc": "2022-06-19T19:15:00",
+  "incident_time_quality": "REPORTED_APPROXIMATE",
+  "field_provenance": {
+    "relative_time_s": "DERIVED",
+    "speed_kmh": "SIMULATED",
+    "x_m": "SIMULATED",
+    "y_m": "SIMULATED",
+    "longitudinal_accel_g": "SIMULATED",
+    "sector": "SIMULATED"
+  },
+  "actual_control_actions": [
+    {
+      "relative_time_s": 5.0,
+      "action": "YELLOW",
+      "source": "RACEFANS",
+      "timing_quality": "REPORTED_APPROXIMATE"
+    },
+    {
+      "relative_time_s": 75.0,
+      "action": "SAFETY CAR",
+      "source": "RACEFANS",
+      "timing_quality": "REPORTED_APPROXIMATE"
+    }
+  ],
+  "presentation_note": "Documented: roughly one lap under yellow flags before the Safety Car (Ferrari's Mattia Binotto: 'it took very long to decide for the Safety Car').",
+  "weather_context": {
+    "rainfall": false,
+    "source": "REPORTED",
+    "quality": "REPORTED"
+  },
+  "track_context": {
+    "location": "Pit-lane exit",
+    "source": "RACEFANS",
+    "quality": "REPORTED"
+  },
+  "notes": [
+    "Historical control actions and FlagSense recommendations are separate outputs.",
+    "The prototype RED_RECOMMENDED state is not an FIA red-flag rule."
+  ],
+  "limitations": [
+    "No licensed incident photograph is bundled.",
+    "Fallback motion is simulated and illustrates documented conditions, not measured car motion.",
+    "Control-action timings are approximate, derived from contemporary reporting (single source)."
+  ]
+}

@@ -1,5 +1,53 @@
+# Python environments, bytecode, and build output
 .venv/
+venv/
+env/
 __pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Local configuration and secrets; keep the documented template
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Test, analysis, editor, and OS state
 .pytest_cache/
-.superpowers/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.vscode/
+.idea/
 .DS_Store
+*.log
+.superpowers/
+
+# Temporary data, private uploads, and sensitive API caches
+*.tmp
+*.temp
+*.swp
+*~
+data/uploads/
+data/private/
+data/cache/
+data/scenarios/*/telemetry.csv
+data/scenarios/*/track.json
+!data/scenarios/2022_canada_tsunoda/track.json
+!data/scenarios/2024_qatar_mirror_debris/track.json
+data/scenarios/*/weather.csv
+data/scenarios/*/race_control.csv
+data/scenarios/*/scenario-cache.json
+data/scenarios/*/derived_features.csv
+assets/uploads/
+assets/private/
+.cache/vision/
+scripts/.cache/
+scripts/.cache/
+
+# Regenerable large local artifacts; committed demo data and model stay trackable
+data/synthetic/*.csv
+models/cache/

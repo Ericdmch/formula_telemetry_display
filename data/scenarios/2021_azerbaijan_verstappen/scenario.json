@@ -1,0 +1,25 @@
+{
+  "scenario_id": "2021_azerbaijan_verstappen",
+  "title": "2021 Azerbaijan — Verstappen tyre failure",
+  "season": 2021,
+  "event": "Azerbaijan Grand Prix",
+  "session": "Race",
+  "description": "Verstappen suffered a high-speed tyre failure and crashed on the main straight on lap 46. The race was later neutralized by the Safety Car and suspended with a red flag.",
+  "incident_cars": [33],
+  "approaching_cars": [11, 44, 5, 16, 10],
+  "data_quality": "HISTORICALLY_GROUNDED_RECONSTRUCTION",
+  "incident_offset_s": 5.0,
+  "incident_start_time_utc": "2021-06-06T13:31:17",
+  "incident_time_quality": "DERIVED_FROM_FASTF1_SPEED_TRACE_APPROXIMATE",
+  "field_provenance": {"relative_time_s": "DERIVED", "speed_kmh": "SIMULATED", "x_m": "SIMULATED", "y_m": "SIMULATED", "longitudinal_accel_g": "SIMULATED", "sector": "SIMULATED"},
+  "actual_control_actions": [
+    {"relative_time_s": 21.0, "action": "DOUBLE YELLOW", "source": "FASTF1_RACE_CONTROL", "original_time_utc": "2021-06-06T13:31:38", "timing_quality": "FEED_TIMESTAMP"},
+    {"relative_time_s": 24.0, "action": "YELLOW", "source": "FASTF1_RACE_CONTROL", "original_time_utc": "2021-06-06T13:31:41", "timing_quality": "FEED_TIMESTAMP"},
+    {"relative_time_s": 90.0, "action": "SAFETY CAR", "source": "FASTF1_RACE_CONTROL", "original_time_utc": "2021-06-06T13:32:47", "timing_quality": "FEED_TIMESTAMP"},
+    {"relative_time_s": 286.0, "action": "RED FLAG", "source": "FASTF1_RACE_CONTROL", "original_time_utc": "2021-06-06T13:36:03", "timing_quality": "FEED_TIMESTAMP"}
+  ],
+  "weather_context": {"state": "not verified in committed fallback", "quality": "UNAVAILABLE"},
+  "track_context": {"location": "Baku main straight", "source": "FORMULA1", "quality": "REPORTED"},
+  "notes": ["An earlier tyre-related crash involving Stroll occurred in the same race; it is historical context and is not a live model feature.", "The prototype RED_RECOMMENDED state is not an FIA red-flag rule."],
+  "limitations": ["No licensed incident image is bundled.", "Fallback motion is simulated.", "T=0 is interpreted from the speed trace; relative delays inherit onset uncertainty."]
+}
