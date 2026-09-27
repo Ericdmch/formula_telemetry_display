@@ -1,77 +1,84 @@
 #include <Arduino.h>
 
-#include "Display.h"
-#include "FlagMessage.h"
-#include "LEDs.h"
+#include "HardwareConfig.h"
 #include "Renderer.h"
 #include "SerialProtocol.h"
-#include "StateMachine.h"
 
 namespace {
-flagsense::LineFramer framer;
-flagsense::StateMachine stateMachine;
-flagsense::Renderer renderer;
-unsigned long lastStatusOutput = 0;
-constexpr unsigned long STATUS_HEARTBEAT_MS = 1000;
+using namespace flagsense;
+Renderer renderer;
+LineFramer framer;
+constexpr unsigned long HEARTBEAT_MS = 1000;
+unsigned long lastHeartbeat = 0;
+// Link supervision: any valid message restarts the watchdog. Only once a
+// valid message has been seen can a timeout mean LINK_LOST.
+unsigned long lastValidRx = 0;
+bool everValid = false;
 
-void logParseError(flagsense::ParseError error) {
-  Serial.print("STATUS,REJECTED,");
-  Serial.println(flagsense::parseErrorName(error));
+void heartbeat() {
+  const unsigned long now = millis();
+  if (now - lastHeartbeat >= HEARTBEAT_MS) {
+    lastHeartbeat = now;
+    Serial.println("STATUS,READY");
+  }
 }
 
 void handleLine(const char* line) {
   Serial.print("RX,");
   Serial.println(line);
-  const flagsense::ParseResult result = flagsense::parseMessage(line);
+  const ParseResult result = parseMessage(line);
   if (!result.success) {
-    logParseError(result.error);
+    Serial.print("STATUS,REJECTED,");
+    Serial.println(parseErrorName(result.error));
     return;
   }
-  if (result.message.type == flagsense::MessageType::DEVICE_TEST ||
-      result.message.type == flagsense::MessageType::LED_TEST ||
-      result.message.type == flagsense::MessageType::DISPLAY_TEST) {
-    Serial.print("STATUS,TEST,");
-    Serial.println(flagsense::messageTypeName(result.message.type));
-    renderer.startTest(result.message.type, millis());
-    return;
-  }
-  const bool stateChanged = stateMachine.handleMessage(result.message);
-  if (stateChanged) {
+  lastValidRx = millis();
+  everValid = true;
+  const SystemState before = renderer.state();
+  renderer.setLinkLost(false);  // any valid message recovers the link
+  renderer.handleMessage(result.message);
+  const SystemState after = renderer.state();
+  if (before != after) {
+    if (before == SystemState::LINK_LOST) {
+      Serial.print("STATUS,RECOVERED,");
+      Serial.println(systemStateName(after));
+    }
     Serial.print("STATUS,STATE,");
-    Serial.println(flagsense::systemStateName(stateMachine.state()));
-    renderer.applyState(stateMachine.state(), stateMachine.incident());
+    Serial.println(systemStateName(after));
   }
 }
+
 }  // namespace
 
 void setup() {
   Serial.begin(115200);
-  flagsense::ledsBegin();
-  const bool displayReady = flagsense::displayBegin();
-  stateMachine.begin();
   renderer.begin();
-  if (!displayReady) {
-    Serial.println("STATUS,ERROR,DEVICE_ERROR");
-  }
-  lastStatusOutput = millis();
   Serial.println("STATUS,READY");
 }
 
 void loop() {
-  char line[flagsense::MAX_MESSAGE_LENGTH + 1];
+  renderer.tick();
   while (Serial.available() > 0) {
-    flagsense::ParseError framingError = flagsense::ParseError::NONE;
-    const char byte = static_cast<char>(Serial.read());
-    if (framer.push(byte, line, sizeof(line), framingError)) {
-      if (framingError != flagsense::ParseError::NONE) logParseError(framingError);
-      else handleLine(line);
+    const int byte = Serial.read();
+    if (byte < 0) break;
+    char line[MAX_MESSAGE_LENGTH + 1];
+    ParseError error = ParseError::NONE;
+    if (framer.push(static_cast<char>(byte), line, sizeof(line), error)) {
+      if (error == ParseError::NONE) {
+        handleLine(line);
+      } else {
+        Serial.print("STATUS,REJECTED,");
+        Serial.println(parseErrorName(error));
+      }
     }
   }
-
-  const unsigned long now = millis();
-  if (now - lastStatusOutput >= STATUS_HEARTBEAT_MS) {
-    lastStatusOutput = now;
-    Serial.println("STATUS,READY");
+  // Link-loss watchdog: with no valid message for LINK_LOSS_TIMEOUT_MS the
+  // link is genuinely down. Normal replay progression always heartbeats, so
+  // it never trips falsely.
+  if (everValid && renderer.state() != SystemState::LINK_LOST &&
+      millis() - lastValidRx > LINK_LOSS_TIMEOUT_MS) {
+    renderer.setLinkLost(true);
+    Serial.println("STATUS,LINK_LOST");
   }
-  if (renderer.tick(now)) renderer.applyState(stateMachine.state(), stateMachine.incident());
+  heartbeat();
 }

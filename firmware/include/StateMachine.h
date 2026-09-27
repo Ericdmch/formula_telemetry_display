@@ -4,7 +4,19 @@
 
 namespace flagsense {
 
-enum class SystemState : uint8_t { STARTING, CLEAR, YELLOW, RED, LINK_LOST, ERROR };
+// Display states. There is no separate CLEAR state: the CLEAR wire message is
+// a legacy alias that maps to GREEN (green is the project's normal state).
+enum class SystemState : uint8_t {
+  STARTING,
+  GREEN,
+  YELLOW,
+  DOUBLE_YELLOW,
+  SAFETY_CAR,
+  VSC,
+  RED,
+  LINK_LOST,
+  ERROR
+};
 
 class StateMachine {
  public:

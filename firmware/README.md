@@ -16,10 +16,15 @@ WS2812/NeoPixel ring:
 
 Tie the LCD RW pin to GND. Connect LCD power, ground, and contrast according
 to the module markings. The ring count, data pin, brightness, and LCD pins are
-configurable in `include/HardwareConfig.h`. The ring shows solid green for
-CLEAR, amber for YELLOW, and red for RED; STARTING and ERROR turn it off. The
-onboard RGB NeoPixel mirrors the flag colors; it shows blue before the first
-valid flag and magenta on a device error. Brightness defaults to a low level.
+configurable in `include/HardwareConfig.h`. The ring shows a non-blocking
+LED pattern per flag state — solid green for GREEN, solid amber for YELLOW, a
+slow amber brightness pulse for DOUBLE YELLOW, a 500 ms amber flash for
+SAFETY CAR, an amber double-blink strobe for VSC, and a 400 ms red flash for
+RED. All animation is driven by `tickLeds()` (no `delay()` anywhere), and a
+new recommendation interrupts the previous pattern immediately. STARTING and
+ERROR turn the ring off. LINK_LOST freezes the ring on its last frame and sets
+the onboard RGB NeoPixel to magenta; the onboard pixel otherwise stays off.
+Brightness defaults to a low level.
 Check the board revision printed on the PCB: DevKitC-1 v1.0 uses
 GPIO48 for its onboard pixel and v1.1 uses GPIO38. Change
 `ONBOARD_NEOPIXEL_DATA_PIN` in `include/HardwareConfig.h` if your board uses
@@ -42,32 +47,50 @@ USB serial bytes enter a fixed 128-character line framer. Newline completes a
 message; CRLF is accepted and blank lines are ignored. An overlong line is
 discarded through its newline and reported as `MESSAGE_TOO_LONG`. The pure
 parser tokenizes and validates the line, then returns a typed `ParseResult`.
-Only valid `CLEAR`, `YELLOW`, and `RED` messages reach the state machine. The
+Only valid flag messages reach the state machine; test commands exercise
+outputs without changing the safety state. The
 renderer reads the current state and incident and updates the ring and LCD.
 The parser has no hardware dependencies.
 
 ## Supported messages
 
-The MVP implements `CLEAR`, `YELLOW,<SECTOR>,<DISTANCE>,<HAZARD>`,
-`RED,<SECTOR>,<DISTANCE>,<HAZARD>`, and the protocol's `DEVICE_TEST`,
-`LED_TEST`, and `DISPLAY_TEST` commands. Hazard names match the fixed list in
-the [serial protocol](../FLAGSENSE_SERIAL_PROTOCOL.md). Commands with car IDs
-and `CAUTION` are documented optional extensions and are not enabled in this
-MVP. The device emits `STATUS,READY` at startup and once per second. Completed
-input lines are echoed as `RX,<line>`; accepted test commands report
-`STATUS,TEST,<name>`, state changes report `STATUS,STATE,<state>`, and rejected
-lines report `STATUS,REJECTED,<reason>`.
+The firmware implements protocol v2 (see the
+[serial protocol](../FLAGSENSE_SERIAL_PROTOCOL.md), section 25): `GREEN`,
+`YELLOW`, `DOUBLE_YELLOW`, `SAFETY_CAR`, `VSC`, and `RED` in the classic
+`FLAG,SECTOR,DISTANCE,HAZARD` shape, the legacy `CLEAR` alias (treated exactly
+like `GREEN`), and the extended 7-field shape
+`FLAG,SECTOR,DISTANCE,HAZARD,CAR_ID,SEQ,CONTEXT`. It also handles the
+protocol's `DEVICE_TEST`, `LED_TEST`, and `DISPLAY_TEST` commands. Hazard
+names match the fixed list in the serial protocol; sector, distance, and car
+ID use 0 for "unknown".
 
-The display states are `STARTING`, `CLEAR`, `YELLOW`, `RED`, `LINK_LOST`, and
-`ERROR`. Test commands temporarily exercise outputs and leave the safety state
-unchanged; a later valid flag message cancels the test. Invalid lines are
-reported to serial and never change the state or outputs. Automatic link-loss
-detection is disabled: the most recent valid flag remains displayed until a
-new valid flag arrives or the device is reset.
+The device emits `STATUS,READY` once per second. Completed input lines are
+echoed as `RX,<line>`; state changes report `STATUS,STATE,<state>`; rejected
+lines report `STATUS,REJECTED,<reason>`; link loss and recovery report
+`STATUS,LINK_LOST` and `STATUS,RECOVERED,<state>`.
+
+The display states are `STARTING`, `GREEN`, `YELLOW`, `DOUBLE_YELLOW`,
+`SAFETY_CAR`, `VSC`, `RED`, `LINK_LOST`, and `ERROR`. Test commands temporarily
+exercise outputs and leave the safety state unchanged; a later valid flag
+message cancels the test. Invalid lines are reported to serial and never
+change the state or outputs.
+
+The LCD shows the flag label on line 1 and the sender's short context on line
+2 (`C27 S2 STOPPED`, `DEBRIS REPORTED`); when the sender provides no context,
+line 2 is derived from the real evidence (sector / distance / hazard), and
+GREEN always reads "Track clear" so no stale context survives a return to
+green.
+
+Link supervision is enabled: every valid message restarts a 10 s watchdog
+(`LINK_LOSS_TIMEOUT_MS` in `include/HardwareConfig.h`). If it expires, the
+device enters `LINK_LOST` — the ring freezes on its last frame, the LCD shows
+`LINK LOST` with the last confirmed flag, and the onboard pixel turns magenta.
+The next valid message recovers automatically with `STATUS,RECOVERED,<state>`;
+no reboot is needed.
 
 The protocol does not specify a sector range. By default the parser accepts
-positive 32-bit sector numbers; set `SectorRange` at the call site if the
-chosen circuit has known limits. The parallel LCD has no presence-detection
+sector 0 ("unknown") through the full 32-bit range; set `SectorRange` at the
+call site if the chosen circuit has known limits. The parallel LCD has no presence-detection
 line, so its connection cannot be reported automatically. NeoPixels likewise
 provide no feedback path for detecting a failed pixel.
 
@@ -81,9 +104,12 @@ for serial monitoring. From `firmware/`, run
 with a newline:
 
 ```text
+GREEN
+YELLOW,2,120,STOPPED_CAR,27,1,C27 S2 STOPPED
+VSC,2,0,DEBRIS,0,2,DEBRIS REPORTED
+SAFETY_CAR,3,0,DEBRIS,0,3,
+RED,3,0,SESSION_STOPPED,81,4,C81 S3 SESSION
 CLEAR
-YELLOW,4,120,STOPPED_CAR
-RED,4,0,SESSION_STOPPED
 DEVICE_TEST
 LED_TEST
 DISPLAY_TEST

@@ -1,6 +1,32 @@
 #include "StateMachine.h"
 
+#include <string.h>
+
 namespace flagsense {
+
+namespace {
+
+SystemState messageToState(MessageType type) {
+  switch (type) {
+    case MessageType::CLEAR:
+    case MessageType::GREEN:
+      return SystemState::GREEN;
+    case MessageType::YELLOW:
+      return SystemState::YELLOW;
+    case MessageType::DOUBLE_YELLOW:
+      return SystemState::DOUBLE_YELLOW;
+    case MessageType::SAFETY_CAR:
+      return SystemState::SAFETY_CAR;
+    case MessageType::VSC:
+      return SystemState::VSC;
+    case MessageType::RED:
+      return SystemState::RED;
+    default:
+      return SystemState::STARTING;
+  }
+}
+
+}  // namespace
 
 void StateMachine::begin() {
   state_ = SystemState::STARTING;
@@ -10,46 +36,43 @@ void StateMachine::begin() {
 
 bool StateMachine::handleMessage(const FlagMessage& message) {
   if (!message.valid) return false;
-  const SystemState oldState = state_;
-  const FlagMessage oldIncident = incident_;
   switch (message.type) {
-    case MessageType::CLEAR:
-      state_ = SystemState::CLEAR;
-      confirmedState_ = state_;
-      incident_ = message;
-      break;
-    case MessageType::YELLOW:
-      state_ = SystemState::YELLOW;
-      confirmedState_ = state_;
-      incident_ = message;
-      break;
-    case MessageType::RED:
-      state_ = SystemState::RED;
-      confirmedState_ = state_;
-      incident_ = message;
-      break;
     case MessageType::DEVICE_TEST:
     case MessageType::DISPLAY_TEST:
     case MessageType::LED_TEST:
       return false;
+    default:
+      break;
   }
-  return oldState != state_ || oldIncident.type != incident_.type ||
-         oldIncident.sector != incident_.sector ||
-         oldIncident.distanceMeters != incident_.distanceMeters ||
-         oldIncident.hazard != incident_.hazard ||
-         oldIncident.valid != incident_.valid;
+  const SystemState newState = messageToState(message.type);
+  const SystemState oldState = state_;
+  // A changed flag, or new evidence for the same flag, is a real change.
+  // The sender's seq counter increments every heartbeat, so it is
+  // deliberately excluded: counting it would restart the LED pattern and
+  // re-render the LCD every ~3 s.
+  const bool changed =
+      newState != oldState || incident_.type != message.type ||
+      incident_.sector != message.sector ||
+      incident_.distanceMeters != message.distanceMeters ||
+      incident_.hazard != message.hazard || incident_.carId != message.carId ||
+      strcmp(incident_.context, message.context) != 0;
+  confirmedState_ = newState;
+  state_ = newState;
+  incident_ = message;
+  return changed;
 }
 
 bool StateMachine::setLinkLost(bool linkLost) {
   if (linkLost) {
-    if (state_ == SystemState::LINK_LOST || state_ == SystemState::ERROR) return false;
+    if (state_ == SystemState::LINK_LOST || state_ == SystemState::ERROR) {
+      return false;
+    }
     state_ = SystemState::LINK_LOST;
     return true;
-  } else if (state_ == SystemState::LINK_LOST) {
-    state_ = confirmedState_;
-    return true;
   }
-  return false;
+  if (state_ != SystemState::LINK_LOST) return false;
+  state_ = confirmedState_;
+  return true;
 }
 
 bool StateMachine::setError() {
@@ -60,12 +83,24 @@ bool StateMachine::setError() {
 
 const char* systemStateName(SystemState state) {
   switch (state) {
-    case SystemState::STARTING: return "STARTING";
-    case SystemState::CLEAR: return "CLEAR";
-    case SystemState::YELLOW: return "YELLOW";
-    case SystemState::RED: return "RED";
-    case SystemState::LINK_LOST: return "LINK_LOST";
-    case SystemState::ERROR: return "ERROR";
+    case SystemState::STARTING:
+      return "STARTING";
+    case SystemState::GREEN:
+      return "GREEN";
+    case SystemState::YELLOW:
+      return "YELLOW";
+    case SystemState::DOUBLE_YELLOW:
+      return "DOUBLE_YELLOW";
+    case SystemState::SAFETY_CAR:
+      return "SAFETY_CAR";
+    case SystemState::VSC:
+      return "VSC";
+    case SystemState::RED:
+      return "RED";
+    case SystemState::LINK_LOST:
+      return "LINK_LOST";
+    case SystemState::ERROR:
+      return "ERROR";
   }
   return "UNKNOWN";
 }

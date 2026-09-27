@@ -8,9 +8,10 @@ namespace flagsense {
 constexpr size_t MAX_MESSAGE_LENGTH = 128;
 
 // The protocol leaves track sector numbering/range open. Configure these for
-// the chosen circuit; the default accepts positive, representable sectors.
+// the chosen circuit. Sector 0 means "unknown" and is accepted by default so
+// a sender can be honest when it has no sector information.
 struct SectorRange {
-  int min = 1;
+  int min = 0;
   int max = 2147483647;
 };
 

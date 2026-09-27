@@ -166,6 +166,32 @@ Any near-zero speed sample is at least `YELLOW` (`STOPPED_CAR_YELLOW`, or a high
 
 For ordinary GREEN frames, `incident` and `closest_approaching_car` are `None`, `reasons=[]`, and `vehicles` still lists cars. For DATA_UNAVAILABLE, `flag`, `rule_id`, `incident`, `closest_approaching_car`, and `features` are `None`; `severity="UNKNOWN"`, `risk_score=0.0`, and all three probability values are 0.0 placeholders. Explain the failure in `quality_notes`. Consumers must branch on `status` before displaying a score or attempting hardware output. A future schema revision may replace these placeholders with nulls, but must update all producers/consumers/tests together. Neither UI nor hardware may infer a flag from `risk_score` without the rule engine.
 
+## HardwareLink — implemented dashboard → ESP32 boundary
+
+`src/hardware_link.py` is the single translation layer between the pipeline
+and the ESP32 marshal display. It owns the flag vocabulary map
+(`WIRE_FLAG`: pipeline `RED_RECOMMENDED` → wire `RED`, all other flags
+identity), the evidence-based rule-to-hazard map (`RULE_HAZARD`; unknown rules
+→ `UNKNOWN_HAZARD`, never an invented hazard), and the LCD-safe context
+builder (`build_context`: ≤16 chars, no commas, built from `incident`
+evidence only — `C27 S2 STOPPED`, `DEBRIS REPORTED`, `Track clear`). The wire
+form is `FLAG,SECTOR,DISTANCE,HAZARD,CAR_ID,SEQ,CONTEXT` (`GREEN` bare);
+`0` means unknown for sector/distance/car (the pipeline sends distance `0`).
+`SEQ` is a per-message counter for ordering/audit, not a staleness signal.
+
+`HardwareLink` streams the current `AnalysisResult` over USB serial at 115200
+baud: every 3 s (`HEARTBEAT_S`) even when unchanged, immediately on change.
+`update(result)` snapshots `{flag, rule_id, car_id, sector}`; a `None`/unknown
+flag keeps the last valid recommendation — it never claims GREEN on no data —
+and nothing is sent before the first valid result. A daemon sender thread owns
+the cadence and retries the port on failure; a reader thread drains the
+device's `STATUS,READY` / `STATUS,STATE,` / `RX,` lines into a plain-values
+`status()` dict (device online = seen within 12 s) for the Streamlit panel.
+The firmware holds no flag logic: it renders whatever valid state arrives and
+enters `LINK_LOST` on its own 10 s watchdog, recovering automatically on the
+next valid message. Full wire contract: [serial protocol](../FLAGSENSE_SERIAL_PROTOCOL.md),
+section 25.
+
 ## Change control
 
 ## HistoricalScenario — implemented local replay adapter
