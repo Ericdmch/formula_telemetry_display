@@ -6,11 +6,11 @@ The renderer targets an ESP32-S3-DevKitC-1 N16R8 board and uses a bare
 16-pin HD44780-compatible LCD1602A in 4-bit mode, plus a 24-pixel
 WS2812/NeoPixel ring:
 
-| Signal | ESP32 GPIO |
+| Signal | ESP32-S3 GPIO |
 |---|---:|
-| LCD RS | 4 |
-| LCD Enable | 5 |
-| LCD D4, D5, D6, D7 | 6, 7, 8, 9 |
+| LCD RS | 13 |
+| LCD Enable | 12 |
+| LCD D4, D5, D6, D7 | 4, 5, 6, 7 |
 | NeoPixel data | 18 |
 | Onboard RGB NeoPixel | 48 by default (38 on DevKitC-1 v1.1) |
 
