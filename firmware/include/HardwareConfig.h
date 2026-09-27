@@ -22,4 +22,15 @@ constexpr int ONBOARD_NEOPIXEL_PIN = ONBOARD_NEOPIXEL_DATA_PIN;
 constexpr uint8_t NEOPIXEL_BRIGHTNESS = 32;
 constexpr unsigned long TEST_LED_STEP_MS = 400;
 constexpr unsigned long TEST_DISPLAY_MS = 800;
+
+// Link supervision: the laptop heartbeats every ~3 s, so 10 s without a
+// valid message means the link is genuinely down (not a replay transition).
+constexpr unsigned long LINK_LOSS_TIMEOUT_MS = 10000;
+
+// Non-blocking LED animation timing (no delay() anywhere).
+constexpr unsigned long LED_FLASH_AMBER_MS = 500;  // safety car: on/off period
+constexpr unsigned long LED_FLASH_RED_MS = 400;    // red flag: on/off period
+constexpr unsigned long LED_VSC_CYCLE_MS = 1000;   // VSC double-blink cycle
+constexpr unsigned long LED_PULSE_CYCLE_MS = 1600;  // double-yellow pulse cycle
+constexpr unsigned long LED_PULSE_STEPS = 32;
 }  // namespace flagsense

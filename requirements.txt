@@ -1,5 +1,5 @@
-# Current telemetry, model, tests, and planned local Streamlit dashboard.
-# Add Pillow/pyserial/provider clients only when their adapters are implemented.
+# Current telemetry, model, tests, Streamlit dashboard, and ESP32 driver-display link.
+# Add Pillow/provider clients only when their adapters are implemented.
 numpy>=2.0,<3
 pandas>=2.2,<3
 scikit-learn>=1.7,<2
@@ -7,3 +7,4 @@ joblib>=1.4,<2
 streamlit>=1.37,<2
 plotly>=5.24,<7
 pytest>=8,<10
+pyserial>=3.5,<4

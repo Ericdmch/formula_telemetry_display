@@ -1225,3 +1225,115 @@ STATUS,ERROR,<ERROR_TYPE>
 ```
 
 This is enough to support the full FlagSense hardware MVP.
+
+---
+
+# 25. Protocol v2 (implemented)
+
+Protocol v2 is the contract the FlagSense dashboard (`src/hardware_link.py`)
+and the ESP32 firmware implement. It extends v1 — every v1 message parses
+byte-identically under v2, so v1 senders keep working.
+
+## 25.1 New flag keywords
+
+```text
+GREEN
+DOUBLE_YELLOW
+SAFETY_CAR
+VSC
+```
+
+`CLEAR` is kept as a legacy alias and is treated exactly like `GREEN`. The
+firmware has no separate CLEAR display state: green is the normal state.
+
+## 25.2 Extended message shape
+
+```text
+FLAG,SECTOR,DISTANCE,HAZARD,CAR_ID,SEQ,CONTEXT
+```
+
+Example:
+
+```text
+YELLOW,2,0,STOPPED_CAR,27,142,C27 S2 STOPPED
+```
+
+Field rules:
+
+- `SECTOR`, `DISTANCE`, `CAR_ID`: `0` means "unknown". The parser accepts
+  sector 0 by default so a sender can be honest when it has no sector data.
+  (The pipeline does not currently compute distance; it sends `0`.)
+- `SEQ`: a per-message counter from the sender, used for ordering and audit.
+  It may reset when the laptop restarts. It is NOT a staleness signal —
+  staleness is decided by the firmware link watchdog (§25.4).
+- `CONTEXT`: a short line for LCD line 2, at most 16 characters, no commas.
+  It may be empty — then the firmware derives line 2 from the real evidence
+  (sector / distance / hazard), and green always reads `Track clear` so no
+  stale context survives a return to green. The dashboard builds it from real
+  evidence only (`C27 S2 STOPPED`, `DEBRIS REPORTED`); long AI explanations
+  are never sent to the LCD.
+
+The 1-field and 4-field shapes from v1 remain valid. Test commands
+(`DEVICE_TEST`, `DISPLAY_TEST`, `LED_TEST`) remain 1-field only.
+
+## 25.3 Heartbeat
+
+The laptop sends the current recommendation every ~3 s even when it has not
+changed, and immediately when it changes. A `None`/unknown recommendation is
+never sent as `GREEN`: the laptop keeps heartbeating the last valid
+recommendation, and sends nothing until it has one.
+
+## 25.4 Link-loss behavior (implemented)
+
+The firmware restarts a 10 s watchdog (`LINK_LOSS_TIMEOUT_MS`) on every valid
+message. The 3 s heartbeat means normal replay progression never trips it —
+only a genuine comms failure does. On timeout the device enters `LINK_LOST`:
+the ring freezes on its last frame, the LCD shows `LINK LOST` with the last
+confirmed flag, and the onboard pixel turns magenta. The next valid message
+recovers automatically (`STATUS,RECOVERED,<state>`); no reboot is needed.
+
+## 25.5 ESP32 → laptop status lines
+
+```text
+STATUS,READY            (every 1 s)
+RX,<line>               (every completed input line)
+STATUS,REJECTED,<reason>
+STATUS,STATE,<state>    (on state change)
+STATUS,LINK_LOST
+STATUS,RECOVERED,<state>
+```
+
+The dashboard drains these on a reader thread and shows device-online status
+(device seen within the last 12 s), the last echoed line, and link errors in
+the "Driver display (ESP32)" panel.
+
+## 25.6 LCD layout (16x2)
+
+Line 1: flag label — `GREEN FLAG`, `YELLOW FLAG`, `DOUBLE YELLOW`,
+`SAFETY CAR`, `VSC`, `RED FLAG`.
+
+Line 2: the sender's `CONTEXT` when present; otherwise derived from evidence
+(`S2 STOPPED CAR`, `120m DEBRIS`, `DEBRIS`); `Track clear` for green.
+
+## 25.7 LED patterns
+
+All animation is non-blocking (`tickLeds()`, no `delay()`); a new message
+interrupts the previous pattern immediately.
+
+```text
+GREEN:         solid green
+YELLOW:        solid amber
+DOUBLE_YELLOW: slow amber brightness pulse
+SAFETY_CAR:    amber flash, 500 ms on/off
+VSC:           amber double-blink strobe
+RED:           red flash, 400 ms on/off
+```
+
+## 25.8 Translation layer
+
+`src/hardware_link.py` is the ONE explicit translation layer between the
+pipeline vocabulary and the wire. It owns the flag map (`WIRE_FLAG`:
+`RED_RECOMMENDED` → `RED`, rest identity), the rule-to-hazard map
+(`RULE_HAZARD`, evidence-based; unknown rules → `UNKNOWN_HAZARD` rather than
+an invented hazard), and the ≤16-char context builder (`build_context`). No
+flag logic lives in the firmware — it renders whatever valid state arrives.

@@ -1,6 +1,7 @@
 """Offline race-control demonstration for FlagSense — cleaned demo build."""
 
 from html import escape
+import inspect
 from pathlib import Path
 
 import pandas as pd
@@ -8,6 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from config import Config
+from src.hardware_link import HardwareLink, is_pyserial_available, list_serial_ports
 from src.historical import HistoricalScenario, load_scenario, scenario_ids
 from src.incident_media import IncidentStill, describe_incident_still, load_incident_still
 from src.pipeline import AnalysisResult, SafetyPipeline
@@ -329,6 +331,110 @@ def render_status(result: AnalysisResult) -> None:
     )
 
 
+def render_driver_status_line(link: HardwareLink) -> None:
+    """Compact live line under the recommendation banner (runs in the fragment)."""
+    status = link.status()
+    if not status["connected"]:
+        st.caption('Driver display: not connected — open "Driver display (ESP32)" below to connect.')
+        return
+    online = "online" if status["device_online"] else "waiting for device heartbeat"
+    last = status["last_message"] or "—"
+    age = status["last_sent_age_s"]
+    age_txt = f" · sent {age:.0f}s ago" if age is not None else ""
+    st.caption(f"Driver display: `{status['port']}` · device {online} · `{last}`{age_txt}")
+
+
+def _on_scan_ports() -> None:
+    st.session_state.driver_expander_open = True
+    ports = list_serial_ports()
+    st.session_state.hw_ports = ports
+    if ports:
+        st.session_state.hw_port_choice = ports[0]
+
+
+def _on_connect_port(port: str, link: HardwareLink) -> None:
+    st.session_state.driver_expander_open = True
+    try:
+        link.connect(port)
+        if "latest_result" in st.session_state and st.session_state.latest_result is not None:
+            link.update(st.session_state.latest_result)
+        st.session_state.hw_action_status = ("success", f"Connected to {port}")
+    except Exception as exc:
+        st.session_state.hw_action_status = ("error", f"Could not open {port}: {exc}")
+
+
+def _on_disconnect_port(link: HardwareLink) -> None:
+    st.session_state.driver_expander_open = True
+    link.disconnect()
+    st.session_state.hw_action_status = ("info", "Disconnected from driver display")
+
+
+def render_driver_panel(link: HardwareLink) -> None:
+    """Connection controls + live link status (outside the fragment)."""
+    st.write("Streams the current recommendation to the ESP32 marshal display over USB serial.")
+
+    if not is_pyserial_available():
+        st.warning("`pyserial` is not installed. Run `pip install pyserial` to enable USB communication with the ESP32.")
+
+    # Automatically scan on first view so user does not need to click scan
+    if "hw_ports" not in st.session_state:
+        st.session_state.hw_ports = list_serial_ports()
+
+    ports = st.session_state.get("hw_ports") or []
+    col_scan, col_port = st.columns([1, 2])
+    with col_scan:
+        st.button("Scan for devices", on_click=_on_scan_ports, use_container_width=True)
+    with col_port:
+        options = ports if ports else ["<no ports found — type manually>"]
+        choice = st.selectbox("Serial port", options, key="hw_port_choice")
+        manual = st.text_input("Port (manual override)", key="hw_port_manual")
+    port = manual.strip() or (choice if ports and choice in ports else "")
+    col_c, col_d = st.columns(2)
+    with col_c:
+        st.button(
+            "Connect",
+            disabled=link.is_connected() or not port,
+            on_click=_on_connect_port,
+            args=(port, link),
+            use_container_width=True,
+        )
+    with col_d:
+        st.button(
+            "Disconnect",
+            disabled=not link.is_connected(),
+            on_click=_on_disconnect_port,
+            args=(link,),
+            use_container_width=True,
+        )
+
+    hw_msg = st.session_state.get("hw_action_status")
+    if hw_msg:
+        level, text = hw_msg
+        if level == "success":
+            st.success(text)
+        elif level == "error":
+            st.error(text)
+        elif level == "info":
+            st.info(text)
+
+    status = link.status()
+    st.divider()
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        render_metric_card("Link", "Connected" if status["connected"] else "Down")
+    with s2:
+        render_metric_card("Device", status["device_state"] or ("Online" if status["device_online"] else "—"))
+    with s3:
+        render_metric_card("Messages sent", str(status["seq"]))
+    st.caption(f"Port: {status['port'] or '—'}")
+    if status["last_message"]:
+        st.code(status["last_message"])
+    if status["last_echo"]:
+        st.caption(f"Device echoed: `{status['last_echo']}`")
+    if status["link_error"]:
+        st.warning(f"Link error: {status['link_error']} — retrying automatically")
+
+
 def render_model_detail(result: AnalysisResult) -> None:
     render_panel_heading("Model estimate", result.severity.replace("_", " ").title())
     source = (
@@ -486,6 +592,8 @@ if ("pipeline" not in st.session_state or "result_cache" not in st.session_state
     st.session_state.speed_multiplier = 1
     st.session_state.active_scenario = st.session_state.scenario_choice
     reset_playback()
+if "driver_link" not in st.session_state:
+    st.session_state.driver_link = HardwareLink()
 _static_scenario = selected_scenario()
 @st.fragment(run_every=0.1)
 def race_control() -> None:
@@ -525,6 +633,7 @@ def race_control() -> None:
     if st.session_state.running:
         advance_playback()
     result = st.session_state.latest_result
+    st.session_state.driver_link.update(result)
     session_name = scenario.metadata["title"] if scenario else "Synthetic demo"
     model_name = "SIMULATED-DATA MODEL" if result.model_source == "random_forest" else "RULES FALLBACK"
     status_tone = "" if result.status == "OK" else "red"
@@ -537,6 +646,7 @@ def race_control() -> None:
         "</div>", unsafe_allow_html=True,
     )
     render_status(result)
+    render_driver_status_line(st.session_state.driver_link)
     frame_no = int(float(st.session_state.get("playback_index", 0.0)))
     alpha = float(st.session_state.get("playback_index", 0.0)) - frame_no
     cache = st.session_state.get("result_cache", {})
@@ -587,3 +697,23 @@ if _static_scenario is not None:
     _rel0 = _static_scenario.relative_time(st.session_state.latest_result.timestamp_s)
     with st.expander("Scenario context & provenance", expanded=False):
         render_historical_context(_static_scenario, _rel0)
+if "driver_expander_open" not in st.session_state:
+    st.session_state.driver_expander_open = False
+
+
+def _on_driver_expander_change() -> None:
+    st.session_state.driver_expander_open = st.session_state.driver_expander_widget
+
+
+expander_is_open = (
+    st.session_state.get("driver_expander_open", False)
+    or st.session_state.driver_link.is_connected()
+)
+
+expander_kwargs = {"expanded": expander_is_open}
+if "on_change" in inspect.signature(st.expander).parameters:
+    expander_kwargs["key"] = "driver_expander_widget"
+    expander_kwargs["on_change"] = _on_driver_expander_change
+
+with st.expander("Driver display (ESP32)", **expander_kwargs):
+    render_driver_panel(st.session_state.driver_link)

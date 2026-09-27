@@ -8,15 +8,21 @@ namespace flagsense {
 class Renderer {
  public:
   void begin();
-  void applyState(SystemState state, const FlagMessage& incident);
-  void startTest(MessageType type, unsigned long now);
-  bool tick(unsigned long now);
+  void tick();
+  void renderCurrent();
+  void handleMessage(const FlagMessage& message);
+  void setLinkLost(bool linkLost);
+  void setError();
+  SystemState state() const;
 
  private:
-  MessageType testType_ = MessageType::CLEAR;
+  StateMachine state_;
+  SystemState lastState_ = SystemState::STARTING;
   bool testActive_ = false;
-  unsigned long testStarted_ = 0;
-  int testPhase_ = -1;
+  unsigned long testStart_ = 0;
+  bool ledTestActive_ = false;
+  unsigned long ledTestStart_ = 0;
+  uint8_t ledTestStep_ = 0;
 };
 
 }  // namespace flagsense

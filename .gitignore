@@ -7,6 +7,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+.pio/
 
 # Local configuration and secrets; keep the documented template
 .env

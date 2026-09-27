@@ -74,3 +74,18 @@ def test_historical_incident_shows_recorded_still_in_main_card_without_pausing()
 
     at.get_by_key("reset_demo").click().run()
     assert not any(item.type == "image" for item in at.main)
+
+
+def test_driver_display_expander_remains_open_on_scan() -> None:
+    at = AppTest.from_file(APP, default_timeout=30).run()
+    assert not at.exception
+
+    # Open the driver display expander and click Scan for devices
+    at.session_state["driver_expander_open"] = True
+    scan_btn = [b for b in at.button if b.label == "Scan for devices"][0]
+    scan_btn.click().run()
+
+    assert not at.exception
+    driver_exp = [e for e in at.expander if "Driver display" in e.label][0]
+    assert driver_exp.proto.expanded is True
+    assert "hw_ports" in at.session_state
