@@ -2,6 +2,11 @@
 
 FlagSense is an offline, operator-facing motorsport incident-awareness prototype. It replays multi-car telemetry, estimates incident severity, and explains a GREEN, YELLOW, or RED FLAG RECOMMENDED result to a human decision maker. It does not activate a real flag.
 
+<p align="center">
+  <img src="assets/flagsense_dashboard.png" alt="FlagSense Race Control Dashboard - 2024 Azerbaijan GP Incident Replay" width="100%">
+</p>
+
+
 ## Run the demo
 
 Use Python 3.11 or newer from the repository root:
@@ -69,6 +74,7 @@ Environmental context and structured still-image evidence pass through `FusedFea
 | Path | Purpose |
 | --- | --- |
 | `app.py` | Streamlit track, recommendation, evidence, model output, telemetry, and playback controls |
+| `assets/` | Dashboard CSS styling and preview screenshot |
 | `src/telemetry.py` | CSV validation, ordering, and short-gap interpolation |
 | `src/track.py` | Track geometry and along-track distances |
 | `src/incident_detection.py` | Rolling histories, stops, deceleration, racing-line proxy, and closing traffic |
@@ -78,6 +84,7 @@ Environmental context and structured still-image evidence pass through `FusedFea
 | `src/pipeline.py` | One-frame integration and a stable output contract |
 | `src/historical.py` | Historical scenario validation, local loading, and causal replay |
 | `src/sensor_fusion.py`, `src/vision.py`, `src/incident_media.py` | Typed visual facts, optional image adapter, and reviewed incident still captions |
+| `src/hardware_link.py` | Serial bridge dispatching recommendations and telemetry to the driver display |
 | `data/scenarios/` | Four sourced scenario manifests and simulated offline fallback files |
 | `data/demo_race.csv` | Prerecorded four-car, 10 Hz, 20-second scenario |
 | `data/track.json` | Closed four-sector track used by the demo |
