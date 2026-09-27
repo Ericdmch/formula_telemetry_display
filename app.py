@@ -1,7 +1,7 @@
 """Offline race-control demonstration for FlagSense — cleaned demo build."""
 
-import hashlib
 from html import escape
+from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -9,10 +9,10 @@ import streamlit as st
 
 from config import Config
 from src.historical import HistoricalScenario, load_scenario, scenario_ids
+from src.incident_media import IncidentStill, describe_incident_still, load_incident_still
 from src.pipeline import AnalysisResult, SafetyPipeline
 from src.telemetry import load_telemetry
 from src.track import Track, load_track
-from src.vision import VisionAnalyzer
 
 
 CONFIG = Config()
@@ -24,26 +24,10 @@ FLAG_LABELS = {
     "SAFETY_CAR": "SAFETY CAR",
     "RED_RECOMMENDED": "RED FLAG RECOMMENDED",
 }
-FLAG_COLORS = {
-    "GREEN": "#29c98b",
-    "YELLOW": "#f6c453",
-    "DOUBLE_YELLOW": "#f6c453",
-    "VSC": "#ff9f43",
-    "SAFETY_CAR": "#ff7a45",
-    "RED_RECOMMENDED": "#ff5b62",
-}
-FLAG_BG = {
-    "GREEN": "#10382a",
-    "YELLOW": "#4a3a12",
-    "DOUBLE_YELLOW": "#4a3a12",
-    "VSC": "#3d2a12",
-    "SAFETY_CAR": "#40220f",
-    "RED_RECOMMENDED": "#4d1a1e",
-}
 CLASS_COLORS = {
-    "NORMAL": "#29c98b",
-    "MODERATE_RISK": "#f6c453",
-    "HIGH_RISK": "#ff5b62",
+    "NORMAL": "#38d486",
+    "MODERATE_RISK": "#f7cf3d",
+    "HIGH_RISK": "#f25b57",
 }
 
 
@@ -79,8 +63,6 @@ def _sources_md_cached(scenario_id: str) -> str:
 SCENARIO_LABELS = {
     "2024_azerbaijan_perez_sainz": "2024 Azerbaijan — Pérez/Sainz",
     "2021_azerbaijan_verstappen": "2021 Azerbaijan — Verstappen",
-    "2024_sao_paulo_stroll": "2024 São Paulo — Stroll",
-    "2014_japan_sutil_bianchi": "2014 Japan — Sutil/Bianchi",
     "2022_canada_tsunoda": "2022 Canada — Tsunoda",
     "2024_qatar_mirror_debris": "2024 Qatar — Mirror debris",
 }
@@ -91,22 +73,40 @@ def historical_scenario(scenario_id: str) -> HistoricalScenario:
     return load_scenario(scenario_id)
 
 
+@st.cache_resource
+def scenario_still(scenario_id: str) -> IncidentStill | None:
+    return load_incident_still(historical_scenario(scenario_id).path)
+
+
+def render_incident_still(still: IncidentStill) -> None:
+    st.image(str(still.image_path), width=280)
+    st.write(describe_incident_still(still))
+    st.caption("Recorded incident still · photo capture time unverified · reviewed visual observations")
+
+
 def selected_scenario() -> HistoricalScenario | None:
     key = st.session_state.get("scenario_choice", "Synthetic Demo")
     return None if key == "Synthetic Demo" else historical_scenario(key)
 
 
+def render_incident_camera(scenario: HistoricalScenario | None, result: AnalysisResult) -> None:
+    if scenario is None:
+        st.caption("Select a historical scenario to view its recorded incident still.")
+        return
+    still = scenario_still(scenario.scenario_id)
+    if still is None:
+        st.caption("No recorded incident still is available for this scenario.")
+        return
+    relative = scenario.relative_time(result.timestamp_s)
+    if relative < still.available_at_relative_s:
+        st.caption("Recorded incident still appears at T=0.")
+    else:
+        render_incident_still(still)
+
+
 def current_frames():
     scenario = selected_scenario()
     return demo_frames() if scenario is None else scenario.frames
-
-
-def visual_for_frame(scenario: HistoricalScenario, frame: pd.DataFrame):
-    attached = st.session_state.get("uploaded_visual")
-    if attached is None or attached["scenario_id"] != scenario.scenario_id:
-        return None
-    relative = scenario.relative_time(float(frame["timestamp_s"].iloc[0]))
-    return attached["features"] if relative >= attached["available_at_relative_s"] else None
 
 
 def reset_playback() -> None:
@@ -120,7 +120,7 @@ def reset_playback() -> None:
     st.session_state.pipeline = pipeline
     st.session_state.playback_index = 0.0
     st.session_state.pipeline_index = 0
-    first = (scenario.update_pipeline(pipeline, frames[0], visual_for_frame(scenario, frames[0]))
+    first = (scenario.update_pipeline(pipeline, frames[0])
              if scenario else pipeline.update(frames[0]))
     st.session_state.latest_result = first
     st.session_state.result_cache = {0: first}
@@ -180,7 +180,7 @@ def advance_playback() -> None:
     fed = int(st.session_state.get("pipeline_index", 0))
     while fed < need:
         fed += 1
-        result = (scenario.update_pipeline(st.session_state.pipeline, frames[fed], visual_for_frame(scenario, frames[fed]))
+        result = (scenario.update_pipeline(st.session_state.pipeline, frames[fed])
                   if scenario else st.session_state.pipeline.update(frames[fed]))
         st.session_state.pipeline_index = fed
         cache[fed] = result
@@ -209,7 +209,7 @@ def track_figure(result: AnalysisResult, track: Track,
             x=xs,
             y=ys,
             mode="lines",
-            line={"color": "#3a4f66", "width": 12},
+            line={"color": "#394047", "width": 12},
             hoverinfo="skip",
             showlegend=False,
         )
@@ -228,7 +228,7 @@ def track_figure(result: AnalysisResult, track: Track,
             and car["speed_kmh"] < 80
         )
         is_approaching = car["car_id"] == approaching_id
-        color = "#ff5b62" if is_incident else "#f6c453" if is_approaching else "#73c7ee"
+        color = "#f25b57" if is_incident else "#f7cf3d" if is_approaching else "#61a6f6"
         size = 18 if is_incident else 15 if is_approaching else 12
         figure.add_trace(
             go.Scatter(
@@ -239,7 +239,7 @@ def track_figure(result: AnalysisResult, track: Track,
                     "size": size,
                     "color": color,
                     "symbol": "diamond" if is_incident else "circle",
-                    "line": {"color": "#0b1520", "width": 2},
+                    "line": {"color": "#07090b", "width": 2},
                 },
                 text=[f"#{car['car_id']}"],
                 textposition="top center",
@@ -257,7 +257,7 @@ def track_figure(result: AnalysisResult, track: Track,
         margin={"l": 8, "r": 8, "t": 8, "b": 8},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font={"color": "#e7eef5", "size": 12},
+        font={"color": "#aab2bc", "size": 12},
         # Fixed view: pin the axes to the track geometry (plus padding) so
         # plotly's autorange cannot shift the map as car markers and labels
         # move between frames.
@@ -285,8 +285,8 @@ def speed_figure(result: AnalysisResult, frame_index: int,
     offset = scenario.incident_offset_s if scenario else 0
     figure = go.Figure()
     for car_id, label, color in (
-        (incident_id, f"Car #{incident_id}", "#ff5b62"),
-        (approach_id, f"Car #{approach_id}", "#f6c453"),
+        (incident_id, f"Car #{incident_id}", "#f25b57"),
+        (approach_id, f"Car #{approach_id}", "#f7cf3d"),
     ):
         car = window[window["car_id"] == car_id]
         figure.add_trace(
@@ -298,17 +298,17 @@ def speed_figure(result: AnalysisResult, frame_index: int,
                 name=label,
             )
         )
-    figure.add_vline(x=now_t - offset, line_color="#9bb3c9", line_dash="dot", line_width=1)
+    figure.add_vline(x=now_t - offset, line_color="#75808b", line_dash="dot", line_width=1)
     figure.update_layout(
         height=240,
         margin={"l": 40, "r": 12, "t": 12, "b": 32},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font={"color": "#e7eef5", "size": 11},
+        font={"color": "#aab2bc", "size": 11},
         xaxis_title="Seconds from incident" if scenario else "Replay time (s)",
         yaxis_title="Speed (km/h)",
-        yaxis={"range": [0, 400 if scenario else 230], "gridcolor": "#1e2f42", "zeroline": False},
-        xaxis={"gridcolor": "#1e2f42", "zeroline": False},
+        yaxis={"range": [0, 400 if scenario else 230], "gridcolor": "#272e36", "zeroline": False},
+        xaxis={"gridcolor": "#272e36", "zeroline": False},
         legend={"orientation": "h", "y": 1.08, "x": 0},
     )
     return figure
@@ -317,34 +317,32 @@ def speed_figure(result: AnalysisResult, frame_index: int,
 def render_status(result: AnalysisResult) -> None:
     flag = result.flag
     label = "DATA UNAVAILABLE" if flag is None else FLAG_LABELS.get(flag, flag)
-    color = FLAG_COLORS.get(flag, "#a5b4c2")
-    bg = FLAG_BG.get(flag, "#1a2634")
+    tone = flag.lower() if flag else "unavailable"
     st.markdown(
-        f"<div style='background:{bg};border:1px solid {color};border-radius:10px;"
-        f"padding:12px 14px;margin-bottom:10px'>"
-        f"<div style='font-size:11px;letter-spacing:0.08em;color:#9bb3c9'>CURRENT RECOMMENDATION</div>"
-        f"<div style='font-size:1.7rem;font-weight:800;color:{color};line-height:1.15'>{label}</div>"
-        f"<div style='font-size:11px;color:#9bb3c9;margin-top:4px'>Decision support only · Race control makes the final call</div>"
-        f"</div>",
+        f"<div class='fs-banner {tone}'>"
+        "<div><div class='fs-banner__title'>FlagSense recommendation</div>"
+        f"<div class='fs-banner__value'>{escape(label)}</div>"
+        "<div class='fs-banner__note'>Decision support only · Race control makes the final call</div></div>"
+        f"<div class='fs-banner__score'><b>{result.risk_score:.0%}</b>"
+        "<small>Severity index</small></div></div>",
         unsafe_allow_html=True,
     )
-    c1, c2 = st.columns(2)
-    with c1:
-        render_metric_card("Severity index", f"{result.risk_score:.0%}")
-    with c2:
-        render_metric_card("Severity", result.severity.replace("_", " ").title())
+
+
+def render_model_detail(result: AnalysisResult) -> None:
+    render_panel_heading("Model estimate", result.severity.replace("_", " ").title())
     source = (
         "Simulated-data Random Forest"
         if result.model_source == "random_forest"
         else "Deterministic fallback"
     )
-    st.caption(f"{source} · Rule {result.rule_id or '—'}")
+    st.caption(f"{source} · Rule {result.rule_id or '—'} · Severity index, not accident probability")
     for name, probability in result.probabilities.items():
         lbl = name.replace("_", " ").title()
         col = CLASS_COLORS.get(name, "#a5b4c2")
         st.markdown(
             f"<div style='display:flex;justify-content:space-between;font-size:12px;margin-top:6px'>"
-            f"<span style='color:{col}'>{lbl}</span><span>{probability:.0%}</span></div>",
+            f"<span style='color:{col}'>{escape(lbl)}</span><span>{probability:.0%}</span></div>",
             unsafe_allow_html=True,
         )
         st.progress(min(1.0, max(0.0, float(probability))))
@@ -352,10 +350,15 @@ def render_status(result: AnalysisResult) -> None:
 
 def render_incident(result: AnalysisResult) -> None:
     if result.incident is None:
-        st.info("No active incident. Monitoring all cars.")
+        st.markdown("<div class='fs-empty'>No active incident. Monitoring all cars.</div>", unsafe_allow_html=True)
         return
     incident = result.incident
-    st.markdown(f"**Car #{incident['car_id']} · Sector {incident['sector']}**")
+    st.markdown(
+        "<div class='fs-incident-header'><b>Vehicle incident</b><span class='fs-badge'>ACTIVE</span></div>"
+        f"<div class='fs-car-line'><div class='fs-car-number'>{incident['car_id']}</div>"
+        f"<div><span>Incident vehicle</span><b>Car #{incident['car_id']} · Sector {incident['sector']}</b></div></div>",
+        unsafe_allow_html=True,
+    )
     one, two, three = st.columns(3)
     with one:
         render_metric_card("Speed", f"{incident['speed_kmh']:.0f} km/h")
@@ -365,7 +368,11 @@ def render_incident(result: AnalysisResult) -> None:
         render_metric_card("Peak decel", f"{incident['peak_decel_g']:.1f} g")
     if result.closest_approaching_car:
         car = result.closest_approaching_car
-        st.caption(f"Approaching #{car['car_id']} · {car['distance_m']:.0f} m · {car['speed_kmh']:.0f} km/h")
+        st.markdown(
+            "<div class='fs-approach'>APPROACHING TRAFFIC"
+            f"<b>Car #{car['car_id']} · {car['distance_m']:.0f} m away · {car['speed_kmh']:.0f} km/h</b></div>",
+            unsafe_allow_html=True,
+        )
     else:
         st.caption("No closing traffic in window")
 
@@ -381,14 +388,11 @@ def render_metric_card(label: str, value: str) -> None:
     )
 
 
-def render_reasons(result: AnalysisResult) -> None:
-    if not result.reasons:
-        st.info("No incident evidence requires a flag recommendation.")
-        return
-    for reason in result.reasons:
-        st.markdown(f"- {reason}")
-    if result.flag == "GREEN":
-        st.caption("Monitoring — incident not yet confirmed.")
+def render_panel_heading(title: str, meta: str = "") -> None:
+    st.markdown(
+        f"<div class='fs-panel-heading'><span>{escape(title)}</span><small>{escape(meta)}</small></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def historical_timeline_figure(scenario: HistoricalScenario, results: list[AnalysisResult]) -> go.Figure:
@@ -467,75 +471,22 @@ def render_historical_context(scenario: HistoricalScenario, relative_time_s: flo
 
 st.set_page_config(page_title="FlagSense", layout="wide")
 st.markdown(
-    """
-    <style>
-    .stApp { background: #0b1520; color: #e7eef5; }
-    .block-container { padding-top: 1.0rem; max-width: 1380px; }
-    h1, h2, h3 { color: #edf4fa; letter-spacing: -0.01em; }
-    .metric-card { box-sizing: border-box; display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; height: 5.5rem; margin: 0; padding: 0.75rem 0.85rem; background: #111d2a; border: 1px solid #1e2f42; border-radius: 10px; }
-    .metric-card__label { margin: 0; color: #c3d0dc; font-size: 0.95rem; line-height: 1.3; }
-    .metric-card__value { min-width: 0; margin: auto 0 0; color: #e7eef5; font-size: clamp(0.9rem, 1.6vw, 1.4rem); font-weight: 500; line-height: 1.15; white-space: nowrap; }
-    div[data-testid="stExpander"] { background: #0e1a28; border: 1px solid #1e2f42; border-radius: 10px; }
-    </style>
-    """,
+    "<style>" + (Path(__file__).resolve().parent / "assets" / "dashboard.css").read_text() + "</style>",
     unsafe_allow_html=True,
 )
-st.title("FlagSense")
-st.caption("AI-assisted motorsport safety · Offline incident replay · Prototype thresholds, not official rules")
 choices = ["Synthetic Demo"] + [key for key in SCENARIO_LABELS if key in scenario_ids()]
-st.selectbox("Historical Scenario", choices, format_func=lambda value: SCENARIO_LABELS.get(value, value), key="scenario_choice")
+header_left, header_right = st.columns([1.8, 1], vertical_alignment="bottom")
+with header_left:
+    st.title("FlagSense")
+    st.caption("RACE CONTROL DECISION SUPPORT · OFFLINE INCIDENT REPLAY")
+with header_right:
+    st.selectbox("Replay scenario", choices, format_func=lambda value: SCENARIO_LABELS.get(value, value), key="scenario_choice")
 if ("pipeline" not in st.session_state or "result_cache" not in st.session_state
         or st.session_state.get("active_scenario") != st.session_state.scenario_choice):
     st.session_state.speed_multiplier = 1
     st.session_state.active_scenario = st.session_state.scenario_choice
-    st.session_state.uploaded_visual = None
-    st.session_state.last_image_digest = None
-    st.session_state.image_error = None
     reset_playback()
 _static_scenario = selected_scenario()
-if _static_scenario is not None:
-    _rel0 = _static_scenario.relative_time(st.session_state.latest_result.timestamp_s)
-    with st.expander("Scenario context & provenance", expanded=False):
-        render_historical_context(_static_scenario, _rel0)
-if _static_scenario is not None:
-    with st.sidebar:
-        st.header("Evidence")
-        uploaded = st.file_uploader(
-            "Optional incident still image (kept local)",
-            type=["jpg", "jpeg", "png"],
-            key=f"incident_image_{_static_scenario.scenario_id}",
-        )
-        _rel_now = _static_scenario.relative_time(st.session_state.latest_result.timestamp_s)
-        if uploaded is not None and _rel_now < 0:
-            st.caption("Imagery enters at or after T=0. Advance the replay first.")
-        elif uploaded is not None:
-            image_bytes = uploaded.getvalue()
-            digest = hashlib.sha256(image_bytes).hexdigest()
-            if st.session_state.get("last_image_digest") != digest:
-                st.session_state.last_image_digest = digest
-                st.session_state.uploaded_visual = None
-                st.session_state.image_error = None
-                analyzer = st.session_state.get("vision_analyzer") or VisionAnalyzer()
-                try:
-                    visual = analyzer.analyze(image_bytes)
-                except Exception:
-                    visual = None
-                    st.session_state.image_error = "Image analysis failed; visual evidence was omitted."
-                if visual is not None:
-                    st.session_state.uploaded_visual = {
-                        "scenario_id": _static_scenario.scenario_id,
-                        "digest": digest,
-                        "available_at_relative_s": _rel_now,
-                        "features": visual,
-                    }
-            if st.session_state.get("uploaded_visual") is None:
-                st.caption("Attached — no new structured visual facts from this upload.")
-                if st.session_state.image_error:
-                    st.warning(st.session_state.image_error)
-            else:
-                st.caption("Structured image evidence enters from the next frame onward.")
-
-
 @st.fragment(run_every=0.1)
 def race_control() -> None:
     scenario = selected_scenario()
@@ -544,7 +495,7 @@ def race_control() -> None:
     pos = float(st.session_state.get("playback_index", 0.0))
     c_start, c_pause, c_reset, c_speed, c_progress = st.columns([1, 1, 1, 1.2, 2.2])
     with c_start:
-        if st.button("Start Demo", key="start_demo", disabled=pos >= last, use_container_width=True):
+        if st.button("Play", key="start_demo", disabled=pos >= last, use_container_width=True):
             st.session_state.running = True
     with c_pause:
         if st.button("Pause", key="pause_demo", use_container_width=True):
@@ -574,6 +525,18 @@ def race_control() -> None:
     if st.session_state.running:
         advance_playback()
     result = st.session_state.latest_result
+    session_name = scenario.metadata["title"] if scenario else "Synthetic demo"
+    model_name = "SIMULATED-DATA MODEL" if result.model_source == "random_forest" else "RULES FALLBACK"
+    status_tone = "" if result.status == "OK" else "red"
+    st.markdown(
+        "<div class='fs-status-strip'>"
+        "<span class='fs-status-pill'><i class='fs-dot'></i>MODE <b>REPLAY</b></span>"
+        f"<span class='fs-status-pill'><i class='fs-dot {status_tone}'></i>TELEMETRY <b>{escape(result.status)}</b></span>"
+        f"<span class='fs-status-pill'><i class='fs-dot'></i>MODEL <b>{model_name}</b></span>"
+        f"<span class='fs-status-pill'>SESSION <b>{escape(session_name)}</b></span>"
+        "</div>", unsafe_allow_html=True,
+    )
+    render_status(result)
     frame_no = int(float(st.session_state.get("playback_index", 0.0)))
     alpha = float(st.session_state.get("playback_index", 0.0)) - frame_no
     cache = st.session_state.get("result_cache", {})
@@ -583,21 +546,24 @@ def race_control() -> None:
     current_t = cur.timestamp_s + ((nxt.timestamp_s - cur.timestamp_s) * alpha if nxt else 0.0)
     left, right = st.columns([1.7, 1], gap="large")
     with left:
-        st.subheader("Track view")
-        st.plotly_chart(track_figure(result, st.session_state.pipeline.track, scenario, vehicles), use_container_width=True, config={"displayModeBar": False})
-        st.subheader("Speed telemetry")
-        if scenario:
-            src = "FastF1 car samples" if scenario.metadata["data_quality"] == "REAL_TELEMETRY_WITH_DERIVED_FEATURES" else "SIMULATED reconstruction"
-            st.caption(f"Speed source: {src}")
-        st.plotly_chart(speed_figure(result, frame_no, scenario, current_t), use_container_width=True, config={"displayModeBar": False})
-    with right:
-        render_status(result)
         with st.container(border=True):
-            st.subheader("Incident details")
+            render_panel_heading("Circuit map", f"{len(vehicles)} vehicles · replay positions")
+            st.plotly_chart(track_figure(result, st.session_state.pipeline.track, scenario, vehicles), use_container_width=True, config={"displayModeBar": False})
+        with st.container(border=True):
+            render_panel_heading("Incident telemetry", "Last 8 seconds")
+            if scenario:
+                src = "FastF1 car samples" if scenario.metadata["data_quality"] == "REAL_TELEMETRY_WITH_DERIVED_FEATURES" else "SIMULATED reconstruction"
+                st.caption(f"Speed source: {src}")
+            st.plotly_chart(speed_figure(result, frame_no, scenario, current_t), use_container_width=True, config={"displayModeBar": False})
+    with right:
+        with st.container(border=True):
+            render_panel_heading("Active incident", "Telemetry evidence")
             render_incident(result)
         with st.container(border=True):
-            st.subheader("Why?")
-            render_reasons(result)
+            render_panel_heading("Incident camera", "Recorded still")
+            render_incident_camera(scenario, result)
+        with st.container(border=True):
+            render_model_detail(result)
     if scenario:
         with st.expander("Actual race control vs FlagSense", expanded=False):
             st.subheader("Actual race control vs FlagSense")
@@ -617,3 +583,7 @@ def race_control() -> None:
 
 
 race_control()
+if _static_scenario is not None:
+    _rel0 = _static_scenario.relative_time(st.session_state.latest_result.timestamp_s)
+    with st.expander("Scenario context & provenance", expanded=False):
+        render_historical_context(_static_scenario, _rel0)

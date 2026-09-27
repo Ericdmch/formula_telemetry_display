@@ -1,0 +1,14 @@
+{
+  "image_file": "incident.jpg",
+  "image_sha256": "b43d6d4a6fdbd188cd114880a5baf7a28e03421ee20f298f2b22a6f60f4786e9",
+  "available_at_relative_s": 0.0,
+  "scene": "An AlphaTauri race car is on the grass beside the paved circuit.",
+  "visible_details": [
+    "The car is close to the pit-exit kerb; the broadcast graphic shows a yellow flag."
+  ],
+  "features": {
+    "vehicle_on_track": false,
+    "confidence": 0.8,
+    "source": "cached"
+  }
+}

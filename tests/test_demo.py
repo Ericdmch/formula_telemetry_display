@@ -44,7 +44,7 @@ def test_prerecorded_demo_is_offline_and_repeats_flag_progression(tmp_path: Path
         for result in first
     )
     assert any(
-        result.flag == "RED_RECOMMENDED" and result.timestamp_s <= 19.1
+        result.flag == "SAFETY_CAR" and result.timestamp_s <= 19.1
         for result in first
     )
     assert first_flags == [result.flag for result in second]
@@ -54,14 +54,14 @@ def test_prerecorded_demo_is_offline_and_repeats_flag_progression(tmp_path: Path
     assert stopped["sector"] == 4
 
 
-def test_committed_model_replay_does_not_downgrade_before_red() -> None:
+def test_committed_model_replay_does_not_downgrade_before_safety_car() -> None:
     config = Config()
     results = replay(config.demo_path, SafetyPipeline(config))
     flags = [result.flag for result in results]
 
     assert results[0].model_source == "random_forest"
     first_yellow = flags.index("YELLOW")
-    first_red = flags.index("RED_RECOMMENDED")
-    assert "GREEN" not in flags[first_yellow:first_red]
+    first_safety_car = flags.index("SAFETY_CAR")
+    assert "GREEN" not in flags[first_yellow:first_safety_car]
     assert results[first_yellow].timestamp_s <= 15.1
-    assert results[first_red].timestamp_s <= 19.1
+    assert results[first_safety_car].timestamp_s <= 19.1

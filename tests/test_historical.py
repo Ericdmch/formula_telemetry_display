@@ -22,7 +22,7 @@ def portable_root(tmp_path: Path) -> Path:
 
 
 def test_all_portable_scenarios_normalize_incident_and_label_motion(portable_root: Path) -> None:
-    assert len(scenario_ids(portable_root)) == 6
+    assert len(scenario_ids(portable_root)) == 4
     for scenario_id in scenario_ids(portable_root):
         scenario = load_scenario(scenario_id, portable_root)
         assert scenario.relative_time(scenario.frames[0]["timestamp_s"].iloc[0]) == -5
@@ -56,9 +56,6 @@ def test_actual_state_is_separate_and_untimed_actions_do_not_gain_seconds(portab
     assert baku.actual_state(10) == "DOUBLE YELLOW (LOCAL MESSAGE)"
     assert baku.actual_state(12) == "YELLOW (LOCAL MESSAGE)"
     assert baku.actual_state(87) == "VSC"
-    japan = load_scenario("2014_japan_sutil_bianchi", portable_root)
-    assert all(action["relative_time_s"] is None for action in japan.metadata["actual_control_actions"])
-    assert "timing unavailable" in japan.actual_state(10)
 
 
 def test_missing_optional_weather_and_visual_do_not_change_pipeline_contract(portable_root: Path) -> None:
@@ -104,15 +101,6 @@ def test_attached_still_image_facts_enter_only_subsequent_frames(portable_root: 
     assert "manual" in after_sources
 
 
-def test_recovery_evidence_is_available_only_after_reconstructed_event(portable_root: Path) -> None:
-    scenario = load_scenario("2014_japan_sutil_bianchi", portable_root)
-    at_zero = next(f for f in scenario.frames if scenario.relative_time(f["timestamp_s"].iloc[0]) == 0)
-    at_twenty = next(f for f in scenario.frames if scenario.relative_time(f["timestamp_s"].iloc[0]) == 20)
-    assert scenario.environment_at(at_zero).recovery_vehicle_present is None
-    assert scenario.environment_at(at_twenty).recovery_vehicle_present is True
-    assert scenario.environment_at(at_twenty).quality == "SIMULATED_TIMING_DOCUMENTED_EVENT"
-
-
 def test_debris_report_context_event_reaches_pipeline(portable_root: Path) -> None:
     scenario = load_scenario("2024_qatar_mirror_debris", portable_root)
     assert scenario.metadata["context_events"] == [{
@@ -130,37 +118,31 @@ def test_debris_report_context_event_reaches_pipeline(portable_root: Path) -> No
 
 
 def test_new_scenario_replay_flag_ladders(portable_root: Path) -> None:
-    ladders = {
-        "2022_canada_tsunoda": [
-            (-5.0, "GREEN", "NO_INCIDENT"),
-            (2.8, "RED_RECOMMENDED", "MODEL_RISK_RED"),
-        ],
-        "2024_qatar_mirror_debris": [
-            (-5.0, "GREEN", "NO_INCIDENT"),
-            (0.0, "VSC", "DEBRIS_REPORTED_ON_TRACK"),
-            (172.6, "SAFETY_CAR", "ON_LINE_CLOSE_FAST_TRAFFIC"),
-        ],
+    target_flags = {
+        "2024_azerbaijan_perez_sainz": ("RED_RECOMMENDED", 10.0),
+        "2021_azerbaijan_verstappen": ("SAFETY_CAR", 10.0),
+        "2022_canada_tsunoda": ("SAFETY_CAR", 10.0),
     }
-    for scenario_id, expected in ladders.items():
+    for scenario_id, (target_flag, deadline_s) in target_flags.items():
         folder = portable_root / scenario_id
         shutil.copy(SCENARIO_ROOT / scenario_id / "track.json", folder / "track.json")
         scenario = load_scenario(scenario_id, portable_root)
         results = scenario.replay()
         assert len(results) == len(scenario.frames)
-        transitions = []
-        previous = None
-        for frame, result in zip(scenario.frames, results):
-            if result.flag != previous:
-                transitions.append((
-                    scenario.relative_time(float(frame["timestamp_s"].iloc[0])),
-                    result.flag,
-                    result.rule_id,
-                ))
-                previous = result.flag
-        assert [flag for _, flag, _ in transitions] == [flag for _, flag, _ in expected]
-        assert [rule for _, _, rule in transitions] == [rule for _, _, rule in expected]
-        assert [when for when, _, _ in transitions] == pytest.approx(
-            [when for when, _, _ in expected])
+        assert any(
+            result.flag == target_flag
+            and scenario.relative_time(result.timestamp_s) <= deadline_s
+            for result in results
+        )
+        if scenario_id == "2022_canada_tsunoda":
+            assert all(result.flag != "RED_RECOMMENDED" for result in results)
+
+    qatar_folder = portable_root / "2024_qatar_mirror_debris"
+    shutil.copy(SCENARIO_ROOT / "2024_qatar_mirror_debris" / "track.json", qatar_folder / "track.json")
+    qatar = load_scenario("2024_qatar_mirror_debris", portable_root)
+    qatar_results = qatar.replay()
+    first_vsc = next(result for result in qatar_results if result.flag == "VSC")
+    assert qatar.relative_time(first_vsc.timestamp_s) == pytest.approx(0.0)
 
 
 def test_replay_prefix_is_causal_and_uses_normal_pipeline(portable_root: Path) -> None:

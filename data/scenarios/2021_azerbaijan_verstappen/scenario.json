@@ -19,7 +19,7 @@
     {"relative_time_s": 286.0, "action": "RED FLAG", "source": "FASTF1_RACE_CONTROL", "original_time_utc": "2021-06-06T13:36:03", "timing_quality": "FEED_TIMESTAMP"}
   ],
   "weather_context": {"state": "not verified in committed fallback", "quality": "UNAVAILABLE"},
-  "track_context": {"location": "Baku main straight", "source": "FORMULA1", "quality": "REPORTED"},
+  "track_context": {"location": "Baku main straight", "track_type": "STREET_CIRCUIT", "runoff_available": false, "source": "FORMULA1", "quality": "REPORTED"},
   "notes": ["An earlier tyre-related crash involving Stroll occurred in the same race; it is historical context and is not a live model feature.", "The prototype RED_RECOMMENDED state is not an FIA red-flag rule."],
-  "limitations": ["No licensed incident image is bundled.", "Fallback motion is simulated.", "T=0 is interpreted from the speed trace; relative delays inherit onset uncertainty."]
+  "limitations": ["The user-provided still shows one moment and cannot establish the tyre-failure sequence.", "Fallback motion is simulated.", "T=0 is interpreted from the speed trace; relative delays inherit onset uncertainty."]
 }

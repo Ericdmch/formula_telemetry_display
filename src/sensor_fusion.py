@@ -48,6 +48,8 @@ class VisualFeatures:
 
 @dataclass(frozen=True)
 class FusedFeatures(SafetyFeatures):
+    track_type: str | None = None
+    runoff_available: bool | None = None
     track_wet: bool | None = None
     visibility_condition: str | None = None
     recovery_vehicle_present: bool | None = None
@@ -63,7 +65,7 @@ class FusedFeatures(SafetyFeatures):
 
     def context_dict(self) -> dict:
         return {key: getattr(self, key) for key in (
-            "track_wet", "visibility_condition", "recovery_vehicle_present",
+            "track_type", "runoff_available", "track_wet", "visibility_condition", "recovery_vehicle_present",
             "debris_reported",
             "context_source", "context_quality", "vision_vehicle_on_track",
             "vision_track_blockage_fraction", "vision_debris_visible",
@@ -83,6 +85,8 @@ def fuse_features(telemetry: SafetyFeatures,
             raise ValueError("visual blockage outside [0,1]")
     return FusedFeatures(
         **asdict(telemetry),
+        track_type=environment.track_type if environment else None,
+        runoff_available=environment.runoff_available if environment else None,
         track_wet=environment.track_wet if environment else None,
         visibility_condition=environment.visibility_condition if environment else None,
         recovery_vehicle_present=environment.recovery_vehicle_present if environment else None,

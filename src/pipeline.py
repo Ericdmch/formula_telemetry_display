@@ -178,7 +178,10 @@ class SafetyPipeline:
             reasons=reasons,
             vehicles=vehicles,
             quality_notes=quality_notes,
-            context_evidence=features.context_dict() if features.incident_detected else None,
+            context_evidence=(
+                features.context_dict()
+                if features.incident_detected or visual is not None else None
+            ),
         )
 
     def _unavailable(self, timestamp: float, reason: str) -> AnalysisResult:

@@ -85,7 +85,10 @@ class IncidentDetector:
                 for sample in history
                 if timestamp - sample.timestamp_s <= self.config.decel_lookback_s + 1e-9
             )
-            stopped = stationary_time + 1e-9 >= self.config.stopped_time_s
+            stopped = (
+                float(row.speed_kmh) <= self.config.stopped_speed_kmh
+                or stationary_time + 1e-9 >= self.config.stopped_time_s
+            )
             severe = peak_decel <= self.config.severe_decel_g
             detected.append(
                 DetectedCar(

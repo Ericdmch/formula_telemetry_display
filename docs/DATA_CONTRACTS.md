@@ -51,7 +51,7 @@
 
 ## EnvironmentalContext — implemented
 
-`src.sensor_fusion.EnvironmentalContext` is an immutable dataclass. Values come from local scenario configuration or manual input; no live weather call is required. It also carries `visibility_condition: str | None`, `recovery_vehicle_present: bool | None`, `debris_reported: bool | None`, `source: str | None`, and `quality: str | None`. A scenario's recovery vehicle and debris reports become available only at their labelled `context_events` replay times.
+`src.sensor_fusion.EnvironmentalContext` is an immutable dataclass. Values come from local scenario configuration or manual input; no live weather call is required. It also carries `visibility_condition: str | None`, `recovery_vehicle_present: bool | None`, `debris_reported: bool | None`, `source: str | None`, and `quality: str | None`. `track_type` and `runoff_available` describe the active sector's circuit context. A scenario's recovery vehicle and debris reports become available only at their labelled `context_events` replay times.
 
 | Field | Python type | Unit | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -71,6 +71,8 @@ Unknown values remain `None`. `track_wet=False` is an explicit dry observation, 
 
 `VisionAnalyzer.analyze(image: bytes) -> VisualFeatures | None` is the provider-agnostic interface for one still image. Without a configured provider it returns `None`, so an uploaded image creates no visual claim. A local cached/manual provider must satisfy the same output schema. `source` is `provider`, `cached`, or `manual`. No field contains a flag recommendation or raw image bytes.
 
+The four bundled historical stills each have a scenario-local `visual_features.json` with `image_file`, `image_sha256`, `available_at_relative_s`, `scene`, `visible_details`, and `features`. `src/incident_media.py` verifies the image hash before displaying the reviewed observations; `HistoricalScenario.visual_at` passes only `features` into the pipeline at or after the availability time. The caption builder does not infer the cause of an incident from one frame.
+
 | Field | Python type | Unit | Required | Description |
 | --- | --- | --- | --- | --- |
 | `vehicle_stopped_visible` | `bool | None` | none | Yes | Apparent stationary vehicle; `None` when not assessable. |
@@ -87,7 +89,7 @@ The image model may leave ambiguous observations `None`; confidence and source m
 
 ## FusedFeatures — implemented subset
 
-One immutable object per focus car, constructed by `src/sensor_fusion.py` from `SafetyFeatures`, an optional `EnvironmentalContext`, and optional `VisualFeatures`. It subclasses `SafetyFeatures`, preserving telemetry names and the exact seven-field model vector. Implemented additional fields are `track_wet`, `visibility_condition`, `recovery_vehicle_present`, `debris_reported`, `context_source`, `context_quality`, `vision_vehicle_on_track`, `vision_track_blockage_fraction`, `vision_debris_visible`, `vision_multiple_vehicles`, `vision_confidence`, and `vision_source`. The table below remains a wider future target; its other fields are **not yet implemented**.
+One immutable object per focus car, constructed by `src/sensor_fusion.py` from `SafetyFeatures`, an optional `EnvironmentalContext`, and optional `VisualFeatures`. It subclasses `SafetyFeatures`, preserving telemetry names and the exact seven-field model vector. Implemented additional fields are `track_type`, `runoff_available`, `track_wet`, `visibility_condition`, `recovery_vehicle_present`, `debris_reported`, `context_source`, `context_quality`, `vision_vehicle_on_track`, `vision_track_blockage_fraction`, `vision_debris_visible`, `vision_multiple_vehicles`, `vision_confidence`, and `vision_source`. The table below remains a wider future target; its other fields are **not yet implemented**.
 
 | Field | Python type | Unit | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -124,7 +126,7 @@ The brief's `MLResult` concept is named `ModelResult` in existing Python. Preser
 | `flag` | `Literal["GREEN", "YELLOW", "DOUBLE_YELLOW", "VSC", "SAFETY_CAR", "RED_RECOMMENDED"]` | Yes | Human-facing labels: `DOUBLE_YELLOW` renders “DOUBLE YELLOW”, `VSC` “VIRTUAL SAFETY CAR”, `SAFETY_CAR` “SAFETY CAR”, `RED_RECOMMENDED` “RED FLAG RECOMMENDED”. |
 | `rule_id` | `str` | Yes | Stable identifier for the decisive rule/override. |
 
-Rules should map low/moderate/high risk bands, then apply evidence guardrails. Existing `config.py` already centralizes `yellow_risk_threshold=0.35`, `red_risk_threshold=0.75`, stop/deceleration/traffic distances and times. Add visual blockage threshold there only when visual guardrails are implemented. **All are prototype/demo values, not official FIA thresholds.** `DATA_UNAVAILABLE` is a pipeline status with `flag=None`, not a recommendation value.
+Rules use the model score as a severity signal and apply deterministic evidence guardrails. `config.py` centralizes `yellow_risk_threshold=0.35`, `high_risk_review_threshold=0.75`, stop/deceleration/traffic distances and times, and visual thresholds. A high score alone can produce YELLOW for review, never RED. **All are prototype/demo values, not official FIA thresholds.** `DATA_UNAVAILABLE` is a pipeline status with `flag=None`, not a recommendation value.
 
 Deterministic geometric overrides run **before** the model band and can escalate to `SAFETY_CAR` regardless of model score:
 
@@ -134,11 +136,11 @@ Deterministic geometric overrides run **before** the model band and can escalate
 | `MULTI_CAR_HIGH_RISK` | `SAFETY_CAR` | Multiple cars affected and `risk_score` ≥ `multi_car_risk_threshold` (0.60). |
 | `DEBRIS_REPORTED_ON_TRACK` | `VSC` | Debris reported on the racing line (marshal/race-control report) with the field circulating; fires after the deterministic Safety Car rules and before the model band, so it beats `MODEL_RISK_YELLOW` but never overrides a Safety Car or red. Prototype/demo rule. |
 
-When the model band is GREEN, weaker geometric evidence still escalates: `STOPPED_WITH_TRAFFIC` → `VSC` (stopped, traffic within 200 m closing ≥ 80 km/h) and `STOPPED_ON_LINE` → `DOUBLE_YELLOW` (stopped on the racing-line proxy). Fused visual evidence can force RED: `FUSED_RED_EVIDENCE` (severe blockage + debris/fire, or blockage + multiple vehicles) and `SEVERE_MULTICAR_BLOCKAGE`.
+Any near-zero speed sample is at least `YELLOW` (`STOPPED_CAR_YELLOW`, or a higher result when stronger evidence exists). A sustained stop reaches `VSC` at `vsc_stationary_time_s=5.0`. `SAFETY_CAR` can trigger from close fast traffic, a multi-car incident with high model severity, or a stop lasting `safety_car_stationary_s=4.0` at a street circuit or a location without runoff. `RED_RECOMMENDED` can trigger for multiple affected cars with a stopped car on a street circuit (`MULTI_CAR_STREET_CIRCUIT`), a stop lasting `red_stationary_time_s=180.0` on a street circuit without runoff (`PROLONGED_STREET_CIRCUIT_STOP`), the existing recovery/wet/poor-visibility gate, or high-confidence visual blockage with a stop. All timing values are prototype/demo settings.
 
 **Prototype latch:** `src.risk_engine.latch_flag(previous, new)` orders flags by severity GREEN < YELLOW < DOUBLE_YELLOW < VSC < SAFETY_CAR < RED_RECOMMENDED. Once the pipeline's latched recommendation reaches `VSC` or above, it never downgrades within the same run — a later GREEN/DOUBLE_YELLOW fresh read keeps the earlier flag and rule ID, appending a “no downgrade after escalation” reason. Escalations still stick. `SafetyPipeline.reset()` clears the latch; switching scenarios in the dashboard resets playback. Below `VSC` the fresh read always wins.
 
-**Stationary-time hysteresis (blip tolerance):** `IncidentDetector` computes `stationary_time_s` by walking speed history backward and tolerating excursions above the slow threshold that stay below the recovered threshold and total ≤ `stopped_blip_tolerance_s` (1.5 s) — so a crashed car nudged at walking pace (recovery vehicle contact, sensor noise) stays `stopped`. Without a speed profile the thresholds are the absolute `stopped_speed_kmh` (5 km/h) / `recovered_speed_kmh` (25 km/h); with a profile they scale with the normal pace at each sample's track position (see SpeedProfile). **Prototype/demo values, not official thresholds.**
+**Stationary-time hysteresis (blip tolerance):** `IncidentDetector` computes `stationary_time_s` by walking speed history backward and tolerating excursions above the slow threshold that stay below the recovered threshold and total ≤ `stopped_blip_tolerance_s` (1.5 s) — so a crashed car nudged at walking pace (recovery vehicle contact, sensor noise) stays `stopped`. The rolling history is 300 s so the same timer can distinguish very prolonged stoppages; peak deceleration remains limited to its configured trailing lookback. Without a speed profile the thresholds are the absolute `stopped_speed_kmh` (5 km/h) / `recovered_speed_kmh` (25 km/h); with a profile they scale with the normal pace at each sample's track position (see SpeedProfile). **Prototype/demo values, not official thresholds.**
 
 ## AnalysisResult — implemented telemetry-only JSON-facing pipeline output
 
@@ -160,7 +162,7 @@ When the model band is GREEN, weaker geometric evidence still escalates: `STOPPE
 | `reasons` | `list[str]` | Yes | Ordered evidence strings; empty when none. |
 | `vehicles` | `list[dict]` | Yes | All visible car IDs, x/y, speed, sector for track display. |
 | `quality_notes` | `list[str]` | Yes | Missing/interpolated source, fallback, or validation notices. |
-| `context_evidence` | `dict | None` | No | Structured environmental/visual facts for the chosen incident, with source/quality labels; no raw image. |
+| `context_evidence` | `dict | None` | No | Structured environmental/visual facts for the chosen incident or an available still, with source/quality labels; no raw image. |
 
 For ordinary GREEN frames, `incident` and `closest_approaching_car` are `None`, `reasons=[]`, and `vehicles` still lists cars. For DATA_UNAVAILABLE, `flag`, `rule_id`, `incident`, `closest_approaching_car`, and `features` are `None`; `severity="UNKNOWN"`, `risk_score=0.0`, and all three probability values are 0.0 placeholders. Explain the failure in `quality_notes`. Consumers must branch on `status` before displaying a score or attempting hardware output. A future schema revision may replace these placeholders with nulls, but must update all producers/consumers/tests together. Neither UI nor hardware may infer a flag from `risk_score` without the rule engine.
 

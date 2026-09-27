@@ -46,6 +46,7 @@
   },
   "track_context": {
     "location": "Pit-lane exit",
+    "runoff_available": false,
     "source": "RACEFANS",
     "quality": "REPORTED"
   },
@@ -54,7 +55,7 @@
     "The prototype RED_RECOMMENDED state is not an FIA red-flag rule."
   ],
   "limitations": [
-    "No licensed incident photograph is bundled.",
+    "The user-provided still shows one moment and cannot establish the car's speed or impact sequence.",
     "Fallback motion is simulated and illustrates documented conditions, not measured car motion.",
     "Control-action timings are approximate, derived from contemporary reporting (single source)."
   ]

@@ -64,7 +64,7 @@ def test_confirmed_stop_on_line_recommends_double_yellow() -> None:
     assert decision.rule_id == "STOPPED_ON_LINE"
 
 
-def test_confirmed_stop_off_line_stays_green_without_traffic() -> None:
+def test_confirmed_stop_off_line_gets_yellow_then_vsc_when_prolonged() -> None:
     case = features(
         speed_kmh=0,
         stationary_time_s=2.1,
@@ -73,8 +73,18 @@ def test_confirmed_stop_off_line_stays_green_without_traffic() -> None:
     )
     decision = recommend_flag(case, model(0.1), Config())
 
-    assert decision.flag == "GREEN"
-    assert decision.rule_id == "MODEL_RISK_LOW"
+    assert decision.flag == "YELLOW"
+    assert decision.rule_id == "STOPPED_CAR_YELLOW"
+
+    prolonged = features(
+        speed_kmh=0,
+        stationary_time_s=5.1,
+        on_racing_line=False,
+        incident_detected=True,
+    )
+    decision = recommend_flag(prolonged, model(0.1), Config())
+    assert decision.flag == "VSC"
+    assert decision.rule_id == "SUSTAINED_STOP_VSC"
 
 
 def test_stopped_with_approaching_traffic_recommends_vsc() -> None:
@@ -145,7 +155,7 @@ def test_multiple_affected_cars_and_high_risk_recommend_safety_car() -> None:
     assert decision.rule_id == "MULTI_CAR_HIGH_RISK"
 
 
-def test_high_model_risk_recommends_red_flag() -> None:
+def test_high_model_risk_alone_recommends_yellow_review() -> None:
     case = features(
         speed_kmh=0,
         stationary_time_s=2.5,
@@ -154,8 +164,8 @@ def test_high_model_risk_recommends_red_flag() -> None:
     )
     decision = recommend_flag(case, model(0.9), Config())
 
-    assert decision.flag == "RED_RECOMMENDED"
-    assert decision.rule_id == "MODEL_RISK_RED"
+    assert decision.flag == "YELLOW"
+    assert decision.rule_id == "MODEL_RISK_HIGH_REVIEW"
 
 
 def test_latch_flag_holds_vsc_and_above() -> None:

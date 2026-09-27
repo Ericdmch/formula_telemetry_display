@@ -48,7 +48,18 @@ def latch_flag(previous_flag: str, new_flag: str) -> str:
 def recommend_flag(
     features: SafetyFeatures | FusedFeatures, model_result: ModelResult, config: Config
 ) -> FlagDecision:
-    stopped = features.stationary_time_s >= config.stopped_time_s
+    stopped = (
+        features.speed_kmh <= config.stopped_speed_kmh
+        or features.stationary_time_s >= config.stopped_time_s
+    )
+    street_circuit = (
+        isinstance(features, FusedFeatures)
+        and (features.track_type or "").upper() == "STREET_CIRCUIT"
+    )
+    no_runoff = (
+        isinstance(features, FusedFeatures)
+        and features.runoff_available is False
+    )
     # Prototype/demo: a debris hazard reported on the racing line (marshal /
     # race-control report) with the field circulating is a VSC situation even
     # when no car has stopped — telemetry alone cannot see static debris.
@@ -62,6 +73,9 @@ def recommend_flag(
         )
 
     if isinstance(features, FusedFeatures):
+        # RED is reserved for corroborated operational evidence below. A
+        # model severity estimate alone cannot establish that the circuit is
+        # unsafe to continue on.
         if (stopped and features.recovery_vehicle_present is True
                 and features.track_wet is True
                 and features.visibility_condition == "POOR"):
@@ -72,6 +86,15 @@ def recommend_flag(
                 and features.vision_track_blockage_fraction is not None
                 and features.vision_track_blockage_fraction >= config.vision_blockage_threshold):
             return FlagDecision("RED_RECOMMENDED", "VISUAL_BLOCKAGE_WITH_STOP")
+        if stopped and street_circuit and features.multiple_cars_affected:
+            return FlagDecision("RED_RECOMMENDED", "MULTI_CAR_STREET_CIRCUIT")
+        if (
+            stopped
+            and street_circuit
+            and no_runoff
+            and features.stationary_time_s >= config.red_stationary_time_s
+        ):
+            return FlagDecision("RED_RECOMMENDED", "PROLONGED_STREET_CIRCUIT_STOP")
 
     score = model_result.risk_score
     close_fast_traffic = (
@@ -84,19 +107,32 @@ def recommend_flag(
     # matter what the statistical score says.
     if (
         stopped
-        and features.on_racing_line
-        and features.stationary_time_s >= 4.0
+        and features.stationary_time_s >= config.safety_car_stationary_s
         and close_fast_traffic
     ):
-        return FlagDecision("SAFETY_CAR", "ON_LINE_CLOSE_FAST_TRAFFIC")
-    if features.multiple_cars_affected and score >= 0.60:
+        rule_id = (
+            "ON_LINE_CLOSE_FAST_TRAFFIC"
+            if features.on_racing_line
+            else "STOPPED_WITH_FAST_TRAFFIC"
+        )
+        return FlagDecision("SAFETY_CAR", rule_id)
+    if features.multiple_cars_affected and score >= config.multi_car_risk_threshold:
         return FlagDecision("SAFETY_CAR", "MULTI_CAR_HIGH_RISK")
+    if (
+        stopped
+        and features.stationary_time_s >= config.safety_car_stationary_s
+        and (street_circuit or no_runoff)
+    ):
+        return FlagDecision("SAFETY_CAR", "STOPPED_IN_HIGH_RISK_LOCATION")
 
     if debris_vsc:
         return FlagDecision("VSC", "DEBRIS_REPORTED_ON_TRACK")
 
-    if score >= config.red_risk_threshold:
-        decision = FlagDecision("RED_RECOMMENDED", "MODEL_RISK_RED")
+    if stopped and features.stationary_time_s >= config.vsc_stationary_time_s:
+        return FlagDecision("VSC", "SUSTAINED_STOP_VSC")
+
+    if score >= config.high_risk_review_threshold:
+        decision = FlagDecision("YELLOW", "MODEL_RISK_HIGH_REVIEW")
     elif score >= config.yellow_risk_threshold:
         decision = FlagDecision("YELLOW", "MODEL_RISK_YELLOW")
     else:
@@ -112,4 +148,6 @@ def recommend_flag(
         return FlagDecision("VSC", "STOPPED_WITH_TRAFFIC")
     if decision.flag == "GREEN" and stopped and features.on_racing_line:
         return FlagDecision("DOUBLE_YELLOW", "STOPPED_ON_LINE")
+    if decision.flag == "GREEN" and stopped:
+        return FlagDecision("YELLOW", "STOPPED_CAR_YELLOW")
     return decision

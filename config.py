@@ -10,9 +10,14 @@ ROOT = Path(__file__).resolve().parent
 @dataclass(frozen=True)
 class Config:
     sample_interval_s: float = 0.1
-    history_window_s: float = 8.0
+    # Retain enough speed history to distinguish a brief stop from a
+    # prolonged street-circuit blockage (up to the prototype red threshold).
+    history_window_s: float = 300.0
     stopped_speed_kmh: float = 5.0
     stopped_time_s: float = 2.0
+    vsc_stationary_time_s: float = 5.0
+    safety_car_stationary_s: float = 4.0
+    red_stationary_time_s: float = 180.0
     # Prototype/demo hysteresis: a stopped episode ends only when the car is
     # clearly moving again, so brief low-speed blips (recovery handling, sensor
     # noise) do not reset the stationary timer.
@@ -35,8 +40,9 @@ class Config:
     high_closing_speed_kmh: float = 120.0
     nearby_distance_m: float = 150.0
     multicar_radius_m: float = 35.0
+    multi_car_risk_threshold: float = 0.60
     yellow_risk_threshold: float = 0.35
-    red_risk_threshold: float = 0.75
+    high_risk_review_threshold: float = 0.75
     vision_min_confidence: float = 0.7
     vision_blockage_threshold: float = 0.5
     max_interpolation_gap_s: float = 0.3

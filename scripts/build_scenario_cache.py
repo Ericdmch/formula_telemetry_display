@@ -25,12 +25,6 @@ PROFILES = {
     "2021_azerbaijan_verstappen": {
         "end": 100, "cars": [(33, 2200, 310, 0, 1.8), (11, 1850, 300, None, None), (44, 1550, 295, None, None)],
     },
-    "2024_sao_paulo_stroll": {
-        "end": 60, "cars": [(18, 2200, 165, 0, 0.8), (1, 1750, 205, None, None), (16, 1450, 210, None, None)],
-    },
-    "2014_japan_sutil_bianchi": {
-        "end": 110, "cars": [(99, 2200, 170, 0, 1.5), (17, 1600, 175, 103, 105)],
-    },
 }
 
 
@@ -52,8 +46,6 @@ def build(scenario_id: str) -> Path:
     for tick in range(int((profile["end"] + 5) / 0.2) + 1):
         relative = round(-5 + tick * 0.2, 1)
         for car_id, _, base, onset, stopped_at in profile["cars"]:
-            if scenario_id == "2014_japan_sutil_bianchi" and car_id == 17 and relative < 90:
-                continue
             state = cars[car_id]
             speed = speed_at(relative, base, onset, stopped_at)
             if tick:
@@ -62,10 +54,6 @@ def build(scenario_id: str) -> Path:
             state["last_speed"] = speed
             s_m = state["s"] % track.length_m
             x, y = point_at_distance(track, s_m)
-            if scenario_id == "2014_japan_sutil_bianchi" and (
-                (car_id == 99 and relative >= 0) or (car_id == 17 and relative >= 103)
-            ):
-                y += 20  # simulated runoff offset from the synthetic centerline
             rows.append({
                 "timestamp_s": round(relative + 5, 1), "relative_time_s": relative,
                 "car_id": car_id, "x_m": round(x, 2), "y_m": round(y, 2),
