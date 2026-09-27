@@ -8,13 +8,27 @@ def build_reasons(
     features: SafetyFeatures | FusedFeatures, decision: FlagDecision, config: Config
 ) -> list[str]:
     if not features.incident_detected:
-        return []
+        reasons = []
+        if isinstance(features, FusedFeatures):
+            if features.debris_reported is True:
+                reasons.append("Debris is reported on the track in this replay")
+            if features.vision_debris_visible is True:
+                reasons.append("A fragment is visible in the recorded still image")
+        return reasons
     reasons: list[str] = []
-    stopped = features.stationary_time_s >= config.stopped_time_s
+    stopped = (
+        features.speed_kmh <= config.stopped_speed_kmh
+        or features.stationary_time_s >= config.stopped_time_s
+    )
     if stopped:
-        reasons.append(
-            f"Car #{features.car_id} stationary for {features.stationary_time_s:.1f} s"
-        )
+        if features.stationary_time_s > 0:
+            reasons.append(
+                f"Car #{features.car_id} stationary for {features.stationary_time_s:.1f} s"
+            )
+        else:
+            reasons.append(
+                f"Car #{features.car_id} at near-zero speed ({features.speed_kmh:.1f} km/h)"
+            )
     if stopped and features.on_racing_line:
         reasons.append(
             f"Car #{features.car_id} is within "

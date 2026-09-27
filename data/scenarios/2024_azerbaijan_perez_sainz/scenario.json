@@ -25,7 +25,7 @@
     {"relative_time_s": 87.0, "action": "VSC", "source": "FASTF1_RACE_CONTROL", "original_time_utc": "2024-09-15T12:34:38", "timing_quality": "FEED_TIMESTAMP"}
   ],
   "weather_context": {"rainfall": false, "source": "FASTF1_WEATHER", "quality": "REAL_SAMPLE_NEAR_INCIDENT"},
-  "track_context": {"location": "Turn 2 to Turn 3 run", "visibility": "LOW_SUN_REPORTED", "source": "RACEFANS", "quality": "REPORTED"},
+  "track_context": {"location": "Turn 2 to Turn 3 run", "track_type": "STREET_CIRCUIT", "runoff_available": false, "visibility": "LOW_SUN_REPORTED", "source": "RACEFANS", "quality": "REPORTED"},
   "notes": ["Historical control actions and FlagSense recommendations are separate outputs.", "The prototype RED_RECOMMENDED state is not an FIA VSC equivalent."],
-  "limitations": ["No licensed incident photograph is bundled.", "Fallback telemetry is simulated and illustrates documented conditions, not measured car motion.", "FastF1 timestamps reflect feed records and the T=0 onset is an approximate telemetry interpretation."]
+  "limitations": ["The user-provided still shows one moment and cannot establish the collision sequence.", "Fallback telemetry is simulated and illustrates documented conditions, not measured car motion.", "FastF1 timestamps reflect feed records and the T=0 onset is an approximate telemetry interpretation."]
 }

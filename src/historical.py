@@ -92,11 +92,15 @@ class HistoricalScenario:
         if wet is None and weather.get("state") == "wet":
             wet = True
         return EnvironmentalContext(
-            sector=int(focus.iloc[0]["sector"]), track_wet=wet,
+            sector=int(focus.iloc[0]["sector"]),
+            track_type=track.get("track_type"),
+            runoff_available=track.get("runoff_available"),
+            track_wet=wet,
             visibility_condition=weather.get("visibility_condition"),
             recovery_vehicle_present=recovery,
             debris_reported=debris,
-            source=weather.get("source") or track.get("source"), quality=recovery_quality or debris_quality,
+            source=weather.get("source") or track.get("source"),
+            quality=recovery_quality or debris_quality or track.get("quality"),
         )
 
     def visual_at(self, frame: pd.DataFrame) -> VisualFeatures | None:
@@ -152,6 +156,13 @@ def load_scenario(scenario_id: str, root: Path = SCENARIO_ROOT) -> HistoricalSce
                           and (path / "track.json").is_file())
     metadata_path = cache_metadata if measured_available else path / "scenario.json"
     metadata = json.loads(metadata_path.read_text())
+    if measured_available:
+        source_metadata = json.loads((path / "scenario.json").read_text())
+        cached_track = metadata.setdefault("track_context", {})
+        source_track = source_metadata.get("track_context", {})
+        for key in ("track_type", "runoff_available", "quality"):
+            if cached_track.get(key) is None and key in source_track:
+                cached_track[key] = source_track[key]
     if metadata.get("scenario_id") != scenario_id:
         raise ValueError("scenario id does not match directory")
     for key in ("title", "season", "event", "session", "description", "incident_cars",

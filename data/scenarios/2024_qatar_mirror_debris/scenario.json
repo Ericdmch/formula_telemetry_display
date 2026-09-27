@@ -63,7 +63,7 @@
     "The debris hazard is a documented marshal/race-control report; FlagSense treats it as reported context, not a telemetry detection."
   ],
   "limitations": [
-    "No licensed incident photograph is bundled.",
+    "The user-provided still shows one fragment; its identity comes from the sourced incident report.",
     "Fallback motion is simulated and illustrates documented conditions, not measured car motion.",
     "The real mirror-to-Safety-Car gap was about four laps; the timeline is compressed for demo length.",
     "Control-action timings are approximate, derived from contemporary reporting."

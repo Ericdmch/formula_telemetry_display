@@ -1,0 +1,14 @@
+{
+  "image_file": "incident.png",
+  "image_sha256": "61fcb52f798fd481e9ff2947ad1ca223aa9bd240423f568e11388ff9d10c811b",
+  "available_at_relative_s": 0.0,
+  "scene": "A small dark fragment lies on the racing surface.",
+  "visible_details": [
+    "A blue race car appears blurred in the background."
+  ],
+  "features": {
+    "debris_visible": true,
+    "confidence": 0.85,
+    "source": "cached"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "image_file": "incident.png",
+  "image_sha256": "dc471402b27266910d04c05097468e7d6ae185aa14128b3bd0e7725ce35bca26",
+  "available_at_relative_s": 0.0,
+  "scene": "A Red Bull race car is angled across the paved track.",
+  "visible_details": [
+    "Haze and several small fragments are visible on the road around it."
+  ],
+  "features": {
+    "vehicle_on_track": true,
+    "debris_visible": true,
+    "confidence": 0.8,
+    "source": "cached"
+  }
+}

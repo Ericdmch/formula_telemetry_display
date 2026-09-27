@@ -1,0 +1,14 @@
+{
+  "image_file": "incident.jpg",
+  "image_sha256": "724b0a13b20b78a6230b80b5335d123a03308f0f138da6a847e7e05d851656b3",
+  "available_at_relative_s": 0.0,
+  "scene": "A red Ferrari is beside a yellow track barrier.",
+  "visible_details": [
+    "A wheel is raised near the front-right of the Ferrari."
+  ],
+  "features": {
+    "vehicle_on_track": true,
+    "confidence": 0.75,
+    "source": "cached"
+  }
+}

@@ -31,12 +31,6 @@ EVENTS = {
         "reference_driver": "11", "reference_lap": 44, "seconds_after": 290,
         "sectors": (20, 21),
     },
-    "2024_sao_paulo_stroll": {
-        "year": 2024, "event": "São Paulo Grand Prix", "session": "Qualifying",
-        "anchor": "2024-11-03T11:24:10.5", "drivers": ("18", "1", "16", "4", "22", "31"),
-        "reference_driver": "4", "reference_lap": None, "seconds_after": 60,
-        "sectors": (2, 3),
-    },
 }
 
 

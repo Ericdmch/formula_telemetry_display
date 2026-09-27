@@ -10,7 +10,8 @@ flowchart TB
   TL --> DET
   DET --> FEAT[features.py: SafetyFeatures v1]
   WEATHER[Scenario or manual conditions] --> FUSE[sensor_fusion.py: FusedFeatures]
-  PHOTO[One uploaded still image] --> VISION[vision.py: optional VisionAnalyzer]
+  PHOTO[Optional future still-image provider] --> VISION[vision.py: optional VisionAnalyzer]
+  BUNDLED[Reviewed incident still and cached observations] --> FUSE
   CACHE[Cached/manual visual features] --> VISION
   VISION --> FUSE
   FEAT --> FUSE
@@ -70,6 +71,6 @@ sequenceDiagram
 
 ## Safety and failure behavior
 
-The rules engine is the only place that can produce `GREEN`, `YELLOW`, or `RED_RECOMMENDED`. A stopped car on the racing line with closing traffic must be at least YELLOW; a sustained stop with close, fast traffic can trigger RED_RECOMMENDED. Thresholds live in `config.py` and are **prototype/demo values, not official FIA thresholds**. No component may claim autonomous flag control.
+The rules engine is the only place that can produce `GREEN`, `YELLOW`, `DOUBLE_YELLOW`, `VSC`, `SAFETY_CAR`, or `RED_RECOMMENDED`. A near-zero speed sample gets at least YELLOW. A sustained stop can escalate to VSC, then to Safety Car when traffic, street-circuit layout, or lack of runoff increases exposure. RED requires specific evidence: multiple affected cars with a stopped car on a street circuit, a prolonged street-circuit stop without runoff, a stopped car with a recovery vehicle in wet, poor visibility, or high-confidence visual evidence of major track blockage. A model score alone cannot trigger RED. Thresholds live in `config.py` and are **prototype/demo values, not official FIA thresholds**. No component may claim autonomous flag control.
 
 An unreadable model selects a visibly marked `rules_fallback`; its display values are not ML probabilities. Missing visual API access selects cached or manual evidence, marked by source. With no visual evidence, omit visual claims rather than inventing negatives. Missing/invalid telemetry produces `DATA_UNAVAILABLE`, distinct from GREEN. Hardware failure creates a UI notice without changing `AnalysisResult`. Uploaded images remain local or temporary and must not be committed.
